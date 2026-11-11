@@ -1,0 +1,26 @@
+{
+  "name": "capfootball",
+  "version": "1.0.0",
+  "description": "A 32-team football general manager simulation that runs entirely in the browser.",
+  "private": true,
+  "author": "Derek Cappillo",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "build": "node scripts/build.js",
+    "test": "node scripts/build.js && node --test tests/*.test.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "jsdom": "^24.1.0",
+    "prettier": "^3.3.0"
+  }
+}
