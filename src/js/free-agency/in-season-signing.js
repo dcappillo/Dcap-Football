@@ -62,8 +62,9 @@
       '<div>' +
       '<div style="font-weight:600;color:#fbbf24;font-size:13px">Offseason Free Agency</div>' +
       '<div style="font-size:11px;color:var(--muted2);margin-top:3px;line-height:1.5">' +
-      'All 32 teams are competing for free agents. CPU teams will also submit offers — ' +
-      'pay above market value or sweeten the deal to win the bidding.' +
+      'You get the first look at this market. CPU teams sign players when you close free agency, ' +
+      'so lock up the players you want now. If you offer less than a player asks, ' +
+      'interested CPU teams can still outbid you.' +
       '</div>' +
       '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' +
       '<button onclick="beginDraftPhase()" style="background:var(--accent-dim);' +

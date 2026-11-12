@@ -401,7 +401,8 @@
     if (typeof processContractExpirations === 'function') processContractExpirations();
     if (typeof generateFreeAgentPool === 'function') generateFreeAgentPool();
     ensureMoraleAndChemistry(); /* new free agents need a morale value for signing interest */
-    if (typeof cpuRosterCleanup === 'function') cpuRosterCleanup();
+    /* CPU teams don't sign anyone yet: the user gets first access to the market.
+       CPU signings happen when free agency closes (beginDraftPhase). */
 
     /* Unlock FA section in sidebar */
     showSection('section-free-agency');
@@ -424,6 +425,8 @@
         }
       }
     }
+    /* Then CPU teams release bad fits and fill to the roster minimum */
+    if (typeof cpuRosterCleanup === 'function') cpuRosterCleanup();
 
     /* Hide FA section, show Draft section */
     hideSection('section-free-agency');
