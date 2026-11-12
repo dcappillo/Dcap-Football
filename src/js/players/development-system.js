@@ -9,7 +9,7 @@
    ============================================================ */
 (function () {
   /* ── Dev trait upgrade check ────────────────────────────── */
-  function checkDevUpgrade(player) {
+  function checkDevUpgrade(player, team) {
     var s = player.stats || {};
     var pos = player.positions[0];
     var DEV = ['Normal', 'Star', 'Superstar', 'X-Factor'];
@@ -40,11 +40,15 @@
         qualified = (s.tackles || 0) >= 110;
         break;
       case 'CB':
-      case 'S':
+      case 'FS':
+      case 'SS':
         qualified = (s.interceptions || 0) >= 4;
         break;
-      case 'OL':
-        qualified = (s.gamesPlayed || 0) >= 15;
+      case 'T':
+      case 'G':
+      case 'C':
+        /* Linemen have no counting stats: an 80+ OVR full-season starter on a winning team */
+        qualified = (s.gamesPlayed || 0) >= 15 && player.attributes.overall >= 80 && !!team && team.wins > team.losses;
         break;
       case 'K':
         qualified = (s.fieldGoalsMade || 0) >= 28;
@@ -115,7 +119,7 @@
     listAllTeams(league).forEach(function (team) {
       team.roster.forEach(function (p) {
         applySeasonMinimumGrowth(p); /* enforce minimum OVR gain */
-        checkDevUpgrade(p); /* dev trait upgrade check  */
+        checkDevUpgrade(p, team); /* dev trait upgrade check  */
         p.age++; /* age every player one year */
         p.devAccum = 0; /* reset accumulator          */
       });

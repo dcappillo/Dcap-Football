@@ -98,6 +98,16 @@ async function playSeason({ seed, teamIndex }) {
   run('beginPlayoffsPhase()');
   for (let round = 0; round < 4; round++) click('btnSimWeek');
 
+  const endOfSeason = JSON.parse(
+    window.eval(`JSON.stringify(listAllTeams(league).map(function (t) {
+      return {
+        chemistry: t.chemistry,
+        wins: t.wins,
+        moraleMissing: t.roster.filter(function (p) { return typeof p.morale !== 'number' || isNaN(p.morale); }).length
+      };
+    }))`),
+  );
+
   for (const screen of [
     'renderRoster',
     'renderDepthChart',
@@ -133,17 +143,23 @@ async function playSeason({ seed, teamIndex }) {
     })
   })`);
   window.close();
-  return { errors, alerts, snapshot };
+  return { errors, alerts, snapshot, endOfSeason };
 }
 
 test('a full season and offseason play through without errors', async () => {
-  const { errors, snapshot } = await playSeason({ seed: 12345, teamIndex: 5 });
+  const { errors, snapshot, endOfSeason } = await playSeason({ seed: 12345, teamIndex: 5 });
   assert.deepEqual(errors, []);
   const state = JSON.parse(snapshot);
   assert.equal(state.year, 2);
   assert.equal(state.phase, 'season');
   assert.equal(state.teams.length, 32);
   for (const [id, rosterSize] of state.teams) assert.ok(rosterSize > 0, `${id} has an empty roster`);
+
+  // Morale and chemistry are live: every player has morale, and chemistry tracks results.
+  for (const team of endOfSeason) assert.equal(team.moraleMissing, 0);
+  const byWins = [...endOfSeason].sort((a, b) => b.wins - a.wins);
+  const avgChem = (teams) => teams.reduce((sum, t) => sum + t.chemistry, 0) / teams.length;
+  assert.ok(avgChem(byWins.slice(0, 8)) > avgChem(byWins.slice(-8)), 'winning teams should have better chemistry');
 });
 
 test('the same seed always produces the same league', async () => {

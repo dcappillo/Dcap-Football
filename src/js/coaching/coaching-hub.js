@@ -142,6 +142,25 @@ window.renderCoachingHub = function () {
       '</div>';
   }
 
+  var chem = typeof team.chemistry === 'number' ? team.chemistry : null;
+  var chemHtml =
+    chem === null
+      ? ''
+      : '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px">' +
+        ratingBar('Team Chemistry', chem) +
+        '<div class="small" style="color:var(--muted2)">' +
+        (team.chemistryTrend > 0
+          ? '▲ +' + team.chemistryTrend
+          : team.chemistryTrend < 0
+            ? '▼ ' + team.chemistryTrend
+            : 'Steady') +
+        ' this week' +
+        (team.winningStreak
+          ? ' · ' + Math.abs(team.winningStreak) + '-game ' + (team.winningStreak > 0 ? 'win' : 'losing') + ' streak'
+          : '') +
+        '. Driven by player morale, leadership and results; affects every game.</div>' +
+        '</div>';
+
   var hcCard = card(
     'Head Coach',
     '🏈',
@@ -184,6 +203,7 @@ window.renderCoachingHub = function () {
       '<p class="small" style="margin-bottom:12px">Coaching ratings boost team performance each game. ' +
       'Scheme fit affects player morale and development.</p>' +
       fitHtml +
+      chemHtml +
       '<div style="display:grid;grid-template-columns:1fr;gap:12px">' +
       hcCard +
       ocCard +

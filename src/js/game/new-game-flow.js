@@ -346,6 +346,9 @@ window.saveNewCoach = function () {
     contractRemaining: 5,
   };
 
+  ensureMoraleAndChemistry();
+  stampRosterContinuity();
+
   /* Recompute power with new coach */
   team.powerRating = computeTeamPowerRating(team);
 

@@ -400,6 +400,7 @@
     /* Process contract expirations + generate FA pool */
     if (typeof processContractExpirations === 'function') processContractExpirations();
     if (typeof generateFreeAgentPool === 'function') generateFreeAgentPool();
+    ensureMoraleAndChemistry(); /* new free agents need a morale value for signing interest */
     if (typeof cpuRosterCleanup === 'function') cpuRosterCleanup();
 
     /* Unlock FA section in sidebar */

@@ -391,15 +391,23 @@ function runPreseasonCuts() {
 ------------------------------------------------------------ */
 
 function resetMoraleAndChemistry() {
-  const teams = listAllTeams(league);
+  ensureMoraleAndChemistry();
+  listAllTeams(league).forEach((team) => {
+    /* Players who weren't on this roster at the start of last season.
+       Saves from before continuity tracking have no stamps: skip the penalty. */
+    const tracked = team.roster.some((p) => p.chemTeamId !== undefined);
+    const newcomers = tracked ? team.roster.filter((p) => p.chemTeamId !== team.id).length : 0;
+    const turnoverPenalty = Math.min(12, newcomers * 0.6);
 
-  teams.forEach((team) => {
-    team.chemistry = randomInt(55, 75);
+    const chemistry = CHEMISTRY_BASELINE + (team.chemistry - CHEMISTRY_BASELINE) * 0.5 - turnoverPenalty;
     team.chemistryTrend = 0;
+    team.chemistry = clampRating(chemistry);
+    team.winningStreak = 0;
 
     team.roster.forEach((p) => {
-      p.morale = randomInt(60, 85);
+      p.morale = clampRating(MORALE_BASELINE + (p.morale - MORALE_BASELINE) * 0.5);
       p.moraleTrend = 0;
     });
   });
+  stampRosterContinuity();
 }

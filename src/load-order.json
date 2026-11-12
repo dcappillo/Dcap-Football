@@ -15,7 +15,7 @@
   "js/league/transaction-log.js",
   "js/contracts/negotiation.js",
   "js/contracts/cap-management.js",
-  "js/team/chemistry.js",
+  "js/team/morale-and-chemistry.js",
   "js/team/morale-chemistry-integration.js",
   "js/coaching/job-security.js",
   "js/coaching/coordinators-and-schemes.js",

@@ -311,6 +311,7 @@
     var si = document.getElementById('seasonInfo');
     if (si && league) si.textContent = league.name + ' · Season ' + (window.simYear || 1);
 
+    ensureMoraleAndChemistry();
     return true;
   }
 

@@ -797,6 +797,7 @@ function simulateGame(game, teamMap, userStrategy, userTeamId) {
     home.ties++;
     away.ties++;
   }
+  recordMoraleAndChemistry(home, away, homeScore, awayScore);
 
   /* Distribute totals to individual players */
   distributeStatsToPlayers(home, homeTotals, awayTotals);
