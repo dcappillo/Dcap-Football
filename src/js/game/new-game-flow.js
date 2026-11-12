@@ -256,8 +256,9 @@ window.renderCoachCreation = function (teamId) {
       '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;' +
       'color:var(--accent2);margin-bottom:10px">📋 League Roster</div>' +
       '<div style="font-size:12px;color:var(--muted2);margin-bottom:10px;line-height:1.5">' +
-      'Download the auto-generated roster as a CSV, edit player names, positions, ages and ratings, ' +
-      'then re-import it before starting.' +
+      'Download the league roster as a CSV, edit names, positions, ages, attributes, Potential, dev traits ' +
+      'or contracts in any spreadsheet, then import it before starting. Overall is recalculated from the ' +
+      'attribute columns.' +
       '</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
       '<button onclick="window.downloadRosterTemplate()" ' +
@@ -270,7 +271,7 @@ window.renderCoachCreation = function (teamId) {
       'background:rgba(22,163,74,.12);border-color:var(--accent);color:var(--accent2)">' +
       '📂 Import Custom Roster' +
       '</button>' +
-      '<input type="file" id="_rosterFileInput" accept=".csv" style="display:none" ' +
+      '<input type="file" id="_rosterFileInput" accept=".csv,.tsv,.txt" style="display:none" ' +
       'onchange="window.importCustomRoster(this.files[0]);this.value=\'\'">' +
       '</div>' +
       '<div id="_rosterImportBadge" style="font-size:12px;color:var(--accent2);display:' +
@@ -320,8 +321,7 @@ window.saveNewCoach = function () {
   var nameEl = document.getElementById('coachNameInput');
   var name = nameEl ? nameEl.value.trim() : '';
   if (!name) {
-    if (typeof _toast === 'function') _toast('⚠ Please enter a coach name', false);
-    else alert('Please enter a coach name.');
+    showToast('⚠ Please enter a coach name', false);
     if (nameEl) nameEl.focus();
     return;
   }
@@ -391,295 +391,144 @@ window.saveNewCoach = function () {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   CUSTOM ROSTER — Download Template & Import
+   CUSTOM ROSTER — export the league to CSV and import it back
+   (file format: game/player-csv.js)
 ═══════════════════════════════════════════════════════════ */
 
-/* Ordered list of every granular attribute column (must match ATTR_LABELS keys) */
-var _ROSTER_ATTR_COLS = [
-  'speed',
-  'acceleration',
-  'agility',
-  'strength',
-  'stamina',
-  'awareness',
-  'throwPower',
-  'throwAccShort',
-  'throwAccMid',
-  'throwAccDeep',
-  'elusiveness',
-  'trucking',
-  'jukeMoves',
-  'spinMove',
-  'ballCarrierVision',
-  'carrying',
-  'catching',
-  'catchInTraffic',
-  'routeRunning',
-  'release',
-  'spectacularCatch',
-  'passBlock',
-  'runBlock',
-  'passBlockStrength',
-  'passBlockFootwork',
-  'runBlockStrength',
-  'runBlockFinesse',
-  'blockShedding',
-  'tackle',
-  'powerMoves',
-  'finesseMoves',
-  'pursuit',
-  'playRecognition',
-  'manCoverage',
-  'zoneCoverage',
-  'press',
-  'hitPower',
-  'kickPower',
-  'kickAccuracy',
-];
+var ROSTER_MAX = 55;
+var ROSTER_MIN = 37;
 
-/* Simple quoted-CSV/TSV row parser — auto-detects tab vs comma delimiter */
-var _csvDelimiter = ','; /* set by importCustomRoster before parsing */
-function _parseCSVRow(row) {
-  var delim = _csvDelimiter;
-  /* Tab-delimited: no quoting convention, fast-path split */
-  if (delim === '\t')
-    return row.split('\t').map(function (c) {
-      return c.trim();
-    });
-  var result = [],
-    cur = '',
-    inQ = false;
-  for (var i = 0; i < row.length; i++) {
-    var c = row[i];
-    if (c === '"') {
-      if (inQ && row[i + 1] === '"') {
-        cur += '"';
-        i++;
-      } else inQ = !inQ;
-    } else if (c === delim && !inQ) {
-      result.push(cur.trim());
-      cur = '';
-    } else {
-      cur += c;
-    }
-  }
-  result.push(cur.trim());
-  return result;
-}
-
-function _csvQuote(v) {
-  return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-}
-
-/* Download the current league rosters as a CSV template */
-window.downloadRosterTemplate = function () {
-  if (typeof league === 'undefined' || !league) {
-    if (typeof _toast === 'function') _toast('⚠ No league loaded yet', false);
-    return;
-  }
-
-  /* Header: identity columns + every granular attribute */
-  var header = ['team_id', 'team_name', 'name', 'position', 'age'].concat(_ROSTER_ATTR_COLS);
-  var rows = [header.join(',')];
-
+/** Every rostered player in the league as CSV text. */
+window.buildRosterCsv = function () {
+  var lines = [playerCsvHeader(['team_id', 'team_name']).join(',')];
   listAllTeams(league).forEach(function (team) {
-    var teamName = team.city + ' ' + team.nickname;
-    (team.roster || []).forEach(function (p) {
-      /* Ensure granular attrs exist on the player */
-      var g = p.granularAttrs;
-      if (!g && typeof window.initGranularAttrs === 'function') {
-        g = window.initGranularAttrs(p);
-      }
-      g = g || {};
-
-      var pos = p.positions ? p.positions[0] : 'LB';
-      var row = [_csvQuote(team.id), _csvQuote(teamName), _csvQuote(p.name), _csvQuote(pos), _csvQuote(p.age)];
-      _ROSTER_ATTR_COLS.forEach(function (k) {
-        row.push(_csvQuote(g[k] !== undefined ? g[k] : 60));
-      });
-      rows.push(row.join(','));
+    team.roster.forEach(function (p) {
+      lines.push([team.id, team.city + ' ' + team.nickname].concat(playerCsvCells(p)).map(csvCell).join(','));
     });
   });
-
-  var csv = rows.join('\r\n');
-  var blob = new Blob([csv], { type: 'text/csv' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'roster_template.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  if (typeof _toast === 'function') _toast('📥 roster_template.csv downloaded', true);
+  return lines.join('\r\n');
 };
 
-/* Import a CSV and apply it to the current league */
+/**
+ * Replace rosters with the players in a roster CSV. Teams are matched by
+ * team_id (or "City Nickname" in team_name); teams not in the file keep their
+ * roster. Returns { teams, players, errors, warnings }.
+ */
+window.applyRosterCsv = function (text) {
+  var parsed = parseCsv(text);
+  var iTeamId = parsed.headers.indexOf('teamid');
+  var iTeamName = parsed.headers.indexOf('teamname');
+  if (iTeamId < 0 && iTeamName < 0) {
+    return { teams: 0, players: 0, errors: ['The file needs a team_id (or team_name) column.'], warnings: [] };
+  }
+
+  var result = playersFromCsv(parsed, { idPrefix: '', defaultAge: 25 });
+  var errors = result.errors.slice();
+  var warnings = [];
+
+  var byName = {};
+  listAllTeams(league).forEach(function (t) {
+    byName[(t.city + ' ' + t.nickname).toLowerCase()] = t;
+  });
+  var byTeam = {};
+  result.players.forEach(function (p) {
+    var id = iTeamId >= 0 ? (p.row[iTeamId] || '').trim() : '';
+    var team = teamMap[id] || (iTeamName >= 0 ? byName[(p.row[iTeamName] || '').trim().toLowerCase()] : null);
+    if (!team) {
+      errors.push(p.name + ': unknown team "' + (id || p.row[iTeamName] || '') + '"');
+      return;
+    }
+    delete p.row;
+    (byTeam[team.id] = byTeam[team.id] || []).push(p);
+  });
+
+  var playerCount = 0;
+  Object.keys(byTeam).forEach(function (tid) {
+    var team = teamMap[tid];
+    team.roster = byTeam[tid];
+    team.roster.forEach(function (p) {
+      if (!p.contract) p.contract = generateContract(p.attributes.overall, p.age);
+    });
+    team.capUsed = team.roster.reduce(function (sum, p) {
+      return sum + p.contract.capHitPerYear;
+    }, 0);
+    team.powerRating = computeTeamPowerRating(team);
+    playerCount += team.roster.length;
+
+    var name = team.city + ' ' + team.nickname;
+    if (team.roster.length > ROSTER_MAX)
+      warnings.push(name + ' has ' + team.roster.length + ' players (max ' + ROSTER_MAX + ')');
+    if (team.roster.length < ROSTER_MIN)
+      warnings.push(name + ' has ' + team.roster.length + ' players (min ' + ROSTER_MIN + ')');
+    var missing = Object.keys(STARTER_SLOTS).filter(function (pos) {
+      return !team.roster.some(function (p) {
+        return p.positions[0] === pos;
+      });
+    });
+    if (missing.length) warnings.push(name + ' has no ' + missing.join(', '));
+  });
+
+  var teams = Object.keys(byTeam).length;
+  window._customRosterImported = { teams: teams, players: playerCount };
+  return { teams: teams, players: playerCount, errors: errors, warnings: warnings };
+};
+
+window.downloadRosterTemplate = function () {
+  if (typeof league === 'undefined' || !league) {
+    showToast('⚠ No league loaded yet', false);
+    return;
+  }
+  downloadTextFile(window.buildRosterCsv(), 'capfootball_rosters.csv');
+  showToast('📥 capfootball_rosters.csv downloaded', true);
+};
+
+/** Problems found in an imported file, as a short HTML list for the import badge. */
+function importProblemsHtml(errors, warnings) {
+  var items = errors
+    .map(function (e) {
+      return '<li style="color:#f87171">' + e + '</li>';
+    })
+    .concat(
+      warnings.map(function (w) {
+        return '<li style="color:#fbbf24">' + w + '</li>';
+      }),
+    );
+  if (!items.length) return '';
+  var shown = items.slice(0, 8).join('') + (items.length > 8 ? '<li>…and ' + (items.length - 8) + ' more</li>' : '');
+  return '<ul style="margin:6px 0 0;padding-left:18px;font-size:11px;text-align:left">' + shown + '</ul>';
+}
+window.importProblemsHtml = importProblemsHtml;
+
 window.importCustomRoster = function (file) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function (e) {
+    var r;
     try {
-      var lines = e.target.result.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
-      /* Auto-detect delimiter: if the header row has tabs, treat as TSV */
-      _csvDelimiter = lines[0].indexOf('\t') !== -1 ? '\t' : ',';
-      var headers = _parseCSVRow(lines[0]).map(function (h) {
-        return h
-          .trim()
-          .toLowerCase()
-          .replace(/[^a-z_]/g, '');
-      });
-
-      var iTeamId = headers.indexOf('team_id');
-      var iName = headers.indexOf('name');
-      var iPos = headers.indexOf('position');
-      var iAge = headers.indexOf('age');
-
-      if (iTeamId < 0 || iName < 0 || iPos < 0) {
-        if (typeof _toast === 'function') _toast('⚠ CSV missing required columns (team_id, name, position)', false);
-        return;
-      }
-
-      /* Build a column-index map for every granular attribute present in the CSV.
-         Headers were normalized to lowercase (no uppercase letters), so normalise
-         each _ROSTER_ATTR_COLS key the same way before looking it up.            */
-      var attrColIdx = {};
-      _ROSTER_ATTR_COLS.forEach(function (k) {
-        var normKey = k.toLowerCase().replace(/[^a-z_]/g, '');
-        var idx = headers.indexOf(normKey);
-        if (idx >= 0) attrColIdx[k] = idx;
-      });
-
-      /* Also accept a legacy "overall" column as a fallback */
-      var iOvr = headers.indexOf('overall');
-
-      /* Require at least one of: granular attr columns OR an overall column */
-      var hasGranular = Object.keys(attrColIdx).length > 0;
-      if (!hasGranular && iOvr < 0) {
-        if (typeof _toast === 'function')
-          _toast('⚠ CSV must have granular attribute columns or an overall column', false);
-        return;
-      }
-
-      /* Group rows by team_id */
-      var byTeam = {};
-      for (var i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        var cols = _parseCSVRow(lines[i]);
-        var tid = cols[iTeamId] || '';
-        if (!tid) continue;
-        if (!byTeam[tid]) byTeam[tid] = [];
-
-        /* Read every granular attribute that appears in the CSV */
-        var g = {};
-        _ROSTER_ATTR_COLS.forEach(function (k) {
-          if (attrColIdx[k] !== undefined) {
-            var val = parseInt(cols[attrColIdx[k]]);
-            g[k] = isNaN(val) ? 60 : Math.max(20, Math.min(99, val));
-          }
-        });
-
-        byTeam[tid].push({
-          name: cols[iName] || 'Unknown',
-          pos: cols[iPos] || 'QB',
-          age: parseInt(cols[iAge]) || 23,
-          g: g,
-          legacyOvr: iOvr >= 0 ? parseInt(cols[iOvr]) || null : null,
-        });
-      }
-
-      /* Apply to league */
-      var teamsUpdated = 0,
-        playersImported = 0;
-      listAllTeams(league).forEach(function (team) {
-        var rows = byTeam[team.id];
-        if (!rows || !rows.length) return;
-        team.roster = [];
-        team.capUsed = 0;
-
-        rows.forEach(function (r) {
-          var pos = r.pos;
-          var g = r.g;
-
-          /* If the CSV had no granular attrs (legacy "overall" only), generate
-             a full attribute set seeded from that overall value.              */
-          if (!Object.keys(g).length) {
-            var seedOvr = r.legacyOvr || 72;
-            var fakePlayer = {
-              positions: [pos],
-              granularAttrs: null,
-              attributes: {
-                overall: seedOvr,
-                athleticism: seedOvr,
-                intelligence: seedOvr,
-                toughness: seedOvr,
-                discipline: seedOvr,
-              },
-            };
-            if (typeof window.initGranularAttrs === 'function') {
-              g = window.initGranularAttrs(fakePlayer) || {};
-            }
-          }
-
-          /* Derive overall and composites from the granular set */
-          var overall = 72;
-          var comp = { athleticism: 72, intelligence: 72, toughness: 72, discipline: 72 };
-          if (typeof window.calcPosOVR === 'function' && Object.keys(g).length) {
-            overall = window.calcPosOVR(g, pos);
-          } else if (r.legacyOvr) {
-            overall = r.legacyOvr;
-          }
-          if (typeof window.deriveComposites === 'function' && Object.keys(g).length) {
-            comp = window.deriveComposites(g);
-          }
-
-          var attrs = {
-            overall: overall,
-            athleticism: comp.athleticism,
-            intelligence: comp.intelligence,
-            toughness: comp.toughness,
-            discipline: comp.discipline,
-          };
-
-          var positions = typeof generatePositionsForPlayer === 'function' ? generatePositionsForPlayer(pos) : [pos];
-
-          var contract =
-            typeof generateContract === 'function' ? generateContract(overall, r.age) : { capHitPerYear: 0 };
-
-          var p = {
-            id: typeof globalPlayerId !== 'undefined' ? globalPlayerId++ : Math.random(),
-            name: r.name,
-            positions: positions,
-            age: r.age,
-            attributes: attrs,
-            granularAttrs: Object.keys(g).length ? g : undefined,
-            contract: contract,
-            stats: typeof defaultPlayerStats === 'function' ? defaultPlayerStats() : {},
-          };
-
-          team.roster.push(p);
-          if (contract) team.capUsed += contract.capHitPerYear || 0;
-          playersImported++;
-        });
-
-        if (typeof computeTeamPowerRating === 'function') team.powerRating = computeTeamPowerRating(team);
-        teamsUpdated++;
-      });
-
-      window._customRosterImported = { teams: teamsUpdated, players: playersImported };
-
-      /* Update the status badge if the coach creation screen is still open */
-      var badge = document.getElementById('_rosterImportBadge');
-      if (badge) {
-        badge.innerHTML = '✅ ' + playersImported + ' players across ' + teamsUpdated + ' teams imported';
-        badge.style.color = 'var(--accent2)';
-        badge.style.display = 'block';
-      }
-      if (typeof _toast === 'function')
-        _toast('✅ Custom roster imported — ' + playersImported + ' players, ' + teamsUpdated + ' teams', true);
+      r = window.applyRosterCsv(e.target.result);
     } catch (err) {
-      if (typeof _toast === 'function') _toast('⚠ Import failed: ' + err.message, false);
+      showToast('⚠ Import failed: ' + err.message, false);
+      return;
     }
+    var badge = document.getElementById('_rosterImportBadge');
+    if (badge) {
+      badge.innerHTML =
+        (r.players ? '✅ ' + r.players + ' players across ' + r.teams + ' teams imported' : '⚠ Nothing imported') +
+        importProblemsHtml(r.errors, r.warnings);
+      badge.style.color = r.players ? 'var(--accent2)' : '#f87171';
+      badge.style.display = 'block';
+    }
+    showToast(
+      r.players
+        ? '✅ Custom roster imported — ' +
+            r.players +
+            ' players, ' +
+            r.teams +
+            ' teams' +
+            (r.errors.length ? ' (' + r.errors.length + ' rows skipped)' : '')
+        : '⚠ ' + (r.errors[0] || 'No players found in file'),
+      !!r.players,
+    );
   };
   reader.readAsText(file);
 };

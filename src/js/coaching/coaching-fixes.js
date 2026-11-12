@@ -434,7 +434,7 @@
       if (typeof window.renderCoachingHub === 'function') {
         window.renderCoachingHub();
       }
-      if (typeof _toast === 'function') _toast('✅ ' + c.name + ' hired as Head Coach', true);
+      showToast('✅ ' + c.name + ' hired as Head Coach', true);
     }
   };
 
@@ -501,7 +501,7 @@
 
     /* Never call beginBlackMonday() on a coordinator hire — return to coaching hub */
     if (typeof window.renderCoachingHub === 'function') window.renderCoachingHub();
-    if (typeof _toast === 'function') _toast('✅ ' + c.name + ' hired as OC', true);
+    showToast('✅ ' + c.name + ' hired as OC', true);
   };
 
   /* ── User DC hire screen ─────────────────────────────────── */
@@ -567,25 +567,6 @@
 
     /* Never call beginBlackMonday() on a coordinator hire — return to coaching hub */
     if (typeof window.renderCoachingHub === 'function') window.renderCoachingHub();
-    if (typeof _toast === 'function') _toast('✅ ' + c.name + ' hired as DC', true);
-  };
-
-  /* ── Fix 7: Re-init coordinators after save/load ─────────── */
-  var _origDoLoad = window._doLoad;
-  window._doLoad = function (slotIdx) {
-    if (typeof _origDoLoad === 'function') _origDoLoad(slotIdx);
-    setTimeout(function () {
-      if (
-        typeof league !== 'undefined' &&
-        league &&
-        typeof listAllTeams === 'function' &&
-        typeof initializeCoordinators === 'function'
-      ) {
-        listAllTeams(league).forEach(function (team) {
-          if (!team.oc || !team.dc) initializeCoordinators();
-        });
-      }
-      if (typeof initializeCoachJobSecurity === 'function') initializeCoachJobSecurity();
-    }, 200);
+    showToast('✅ ' + c.name + ' hired as DC', true);
   };
 })();

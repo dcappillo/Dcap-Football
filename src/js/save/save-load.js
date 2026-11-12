@@ -5,7 +5,10 @@
    cache for the "last save" display.
    ============================================================ */
 (function () {
-  var SAVE_VERSION = 1;
+  /* v2 adds the game phase, playoff bracket, draft progress and offseason step.
+     v1 saves still load; their phase is inferred. */
+  var SAVE_VERSION = 2;
+  var OLDEST_SUPPORTED_VERSION = 1;
 
   /* ── LZ-String (inline, MIT) — compresses saves ~4-5× ───── */
   var LZString = (function () {
@@ -259,13 +262,56 @@
       transactionLog: typeof transactionLog !== 'undefined' ? transactionLog : [],
       coachFreeAgents: typeof coachFreeAgents !== 'undefined' ? coachFreeAgents : [],
       coordinatorFAs: typeof coordinatorFreeAgents !== 'undefined' ? coordinatorFreeAgents : [],
+      /* v2 */
+      gmPhase: window.gmPhase || 'season',
+      playoffs: window.playoffs ? toTeamRefs(window.playoffs) : null,
+      draftPickList: window._draftPickList || [],
+      draftAbsIndex: window._draftAbsIndex || 0,
+      customDraftImported: !!window._customDraftImported,
+      headCoachCandidates: typeof headCoachCandidates !== 'undefined' ? headCoachCandidates : [],
     };
+  }
+
+  /* The playoff bracket holds live team objects. JSON would save copies that
+     lose their link to the league, so teams are stored as { $team: id } and
+     re-linked on load. */
+  function toTeamRefs(value) {
+    var teams = new Set(listAllTeams(league));
+    return JSON.parse(
+      JSON.stringify(value, function (key, v) {
+        return v && typeof v === 'object' && teams.has(v) ? { $team: v.id } : v;
+      }),
+    );
+  }
+
+  function fromTeamRefs(value) {
+    if (Array.isArray(value)) return value.map(fromTeamRefs);
+    if (!value || typeof value !== 'object') return value;
+    if (Object.keys(value).length === 1 && value.$team !== undefined) return teamMap[value.$team] || null;
+    Object.keys(value).forEach(function (k) {
+      value[k] = fromTeamRefs(value[k]);
+    });
+    return value;
+  }
+
+  /** Best guess at the phase of a v1 save, which didn't record it. */
+  function inferPhase(state) {
+    var year = state.simYear || 1;
+    var lg = state.league || {};
+    if (lg.freeAgencyOpenedYear === year) return 'offseason';
+    return 'season';
   }
 
   /* ── Restore a captured state back to all live globals ───── */
   function restoreState(state) {
-    if (!state || state.version !== SAVE_VERSION) {
-      _toast && _toast('❌ Save incompatible with this game version', false);
+    if (!state || !(state.version >= OLDEST_SUPPORTED_VERSION && state.version <= SAVE_VERSION)) {
+      _toast &&
+        _toast(
+          state && state.version > SAVE_VERSION
+            ? '❌ This save is from a newer version of the game'
+            : '❌ Save incompatible with this game version',
+          false,
+        );
       return false;
     }
 
@@ -292,6 +338,17 @@
     coachFreeAgents = state.coachFreeAgents || [];
     coordinatorFreeAgents = state.coordinatorFAs || [];
 
+    /* Phase and in-progress postseason / offseason state */
+    window.gmPhase = state.gmPhase || inferPhase(state);
+    window.playoffs = state.playoffs ? fromTeamRefs(state.playoffs) : null;
+    window._draftPickList = state.draftPickList || [];
+    window._draftAbsIndex = state.draftAbsIndex || 0;
+    window._customDraftImported = !!state.customDraftImported;
+    headCoachCandidates = state.headCoachCandidates || [];
+    if (state.version < 2 && window.gmPhase === 'offseason' && !league.offseasonStep) {
+      league.offseasonStep = 'free-agency';
+    }
+
     /* Sync UI */
     renderTeamSelect(); /* rebuild dropdown from loaded league */
     if (state.userTeamId) {
@@ -311,10 +368,54 @@
     var si = document.getElementById('seasonInfo');
     if (si && league) si.textContent = league.name + ' · Season ' + (window.simYear || 1);
 
+    /* Fill in anything older saves are missing */
     ensureMoraleAndChemistry();
     ensureLeaguePotential();
+    if (!window.pickRegistry) window.pickRegistry = {};
+    window.initDraftPicks();
+    if (
+      listAllTeams(league).some(function (t) {
+        return !t.oc || !t.dc;
+      })
+    ) {
+      initializeCoordinators();
+    }
+    initializeCoachJobSecurity();
+    if (typeof window.syncPlaybookDropdowns === 'function') window.syncPlaybookDropdowns();
+    window._gameStarted = true;
+
+    window.applyPhaseLayout();
     return true;
   }
+
+  /** Open the screen that matches where the save left off. */
+  function showLoadedScreen() {
+    if (window.gmPhase === 'offseason' && league.offseasonStep === 'draft') {
+      var draftInProgress = window._draftPickList.length && window._draftAbsIndex < window._draftPickList.length;
+      if (draftInProgress) renderDraftScreen();
+      else renderHome();
+      return;
+    }
+    if (window.gmPhase === 'offseason') {
+      renderFreeAgencyScreen();
+      return;
+    }
+    renderHome();
+  }
+
+  /** The whole game as a save-file string. */
+  window.saveGameToString = function () {
+    return _saveStr(captureState());
+  };
+
+  /** Load a save-file string into the running game. Returns false if it can't be loaded. */
+  window.loadGameFromString = function (raw) {
+    var state = _loadStr(raw);
+    if (!state || !state.league) throw new Error('Save file appears empty or corrupt');
+    if (!restoreState(state)) return false;
+    showLoadedScreen();
+    return true;
+  };
 
   /* ─────────────────────────────────────────────────────────
      SAVE / LOAD — FILE-FIRST SYSTEM
@@ -324,6 +425,11 @@
      localStorage used only as a convenience cache so the
      "last save" info can be displayed; never relied upon.
   ──────────────────────────────────────────────────────── */
+
+  /* Also used by other screens (CSV import/export) */
+  window.showToast = function (msg, ok) {
+    _toast(msg, ok);
+  };
 
   function _toast(msg, ok) {
     var t = document.createElement('div');
@@ -419,32 +525,14 @@
       if (!file) return;
       var reader = new FileReader();
       reader.onload = function (ev) {
-        var state;
         try {
-          state = _loadStr(ev.target.result);
+          if (!window.loadGameFromString(ev.target.result)) return;
         } catch (err) {
           _toast('❌ Invalid save file: ' + err.message, false);
           return;
         }
-        if (!state || !state.league) {
-          _toast('❌ Save file appears empty or corrupt', false);
-          return;
-        }
-        if (!restoreState(state)) return;
-        /* Re-run post-load hooks */
-        if (typeof window.initDraftPicks === 'function') window.initDraftPicks();
-        if (typeof window.syncPlaybookDropdowns === 'function') window.syncPlaybookDropdowns();
-        if (typeof renderHome === 'function') renderHome();
-        _toast(
-          '✅ Game loaded — ' +
-            (state.userTeamId && typeof getTeamById === 'function'
-              ? (function (t) {
-                  return t ? t.city + ' ' + t.nickname : '';
-                })(getTeamById(state.userTeamId))
-              : ''),
-          true,
-        );
-        renderSaveLoad();
+        var team = getTeamById(userTeamId);
+        _toast('✅ Game loaded — ' + (team ? team.city + ' ' + team.nickname : ''), true);
       };
       reader.readAsText(file);
     };

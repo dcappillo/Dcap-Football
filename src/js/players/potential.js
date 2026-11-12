@@ -100,7 +100,8 @@ function ensurePotential(player) {
 function initializeLeaguePotential() {
   listAllTeams(league).forEach(function (team) {
     team.roster.forEach(function (p) {
-      p.potential = rollPotential(p, ESTABLISHED_HEADROOM_FACTOR);
+      if (typeof p.potential !== 'number') p.potential = rollPotential(p, ESTABLISHED_HEADROOM_FACTOR);
+      ensurePotential(p);
     });
   });
   if (typeof freeAgents !== 'undefined' && Array.isArray(freeAgents)) freeAgents.forEach(ensurePotential);

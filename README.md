@@ -97,6 +97,10 @@ One rule that follows from concatenating everything into a single script: don't 
 
 CI runs both on every push, so a broken build never deploys.
 
+## Roster and draft class files
+
+On the coach-creation screen you can download the league roster as a CSV, edit it in any spreadsheet and import it back. The draft screen does the same for each year's draft class. Both use the format described at the top of `src/js/game/player-csv.js`: name, position, age, overall, potential, dev_trait, contract_salary, contract_years and the 39 attribute columns (roster files also have team_id and team_name). When attribute columns are present, overall is recalculated from them. Common position names (LT, DE, MLB, …) are accepted, and rows that can't be read are skipped and listed after import.
+
 ## Player development
 
 Every player has a **Potential**, the highest overall he can reach (`src/js/players/potential.js`). Players grow during the season: fastest when young, starting and productive, slower as they near their Potential, and not at all once they reach it. A development-trait upgrade (Star → Superstar → X-Factor, earned from season stats) re-rolls Potential from the new trait, current overall and age. Players 30 and older decline once a year at the end of the season.

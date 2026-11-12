@@ -15,14 +15,23 @@ let freeAgents = [];
    - Random market players
 ------------------------------------------------------------ */
 
+/** Free agents this old retire instead of staying on the market. */
+const FA_RETIREMENT_AGE = 34;
+/** The market keeps at most this many players (the best by overall). */
+const FA_POOL_MAX = 400;
+
 /** A generated veteran for the open market. */
 function generateMarketPlayer(pos) {
+  const attributes = generateRookieAttributes(pos);
+  const granularAttrs = attributes._granularBag; // keep the attributes his overall was derived from
+  delete attributes._granularBag;
   return {
     id: 'fa_' + globalPlayerId++,
     name: generateRookieName(),
     positions: [pos],
     age: randomInt(23, 32),
-    attributes: generateRookieAttributes(pos),
+    attributes,
+    granularAttrs,
     contract: null,
     stats: defaultPlayerStats(),
     isFreeAgent: true,
@@ -47,6 +56,12 @@ function generateFreeAgentPool() {
 
   // 2. Generated market players (to keep FA pool interesting)
   for (let i = 0; i < 40; i++) add(generateMarketPlayer(generateRookiePosition()));
+
+  // 3. Unsigned players retire: without this the pool (and save files) grew every year
+  freeAgents = freeAgents
+    .filter((p) => (p.age || 0) < FA_RETIREMENT_AGE)
+    .sort((a, b) => b.attributes.overall - a.attributes.overall)
+    .slice(0, FA_POOL_MAX);
 }
 
 /* ------------------------------------------------------------

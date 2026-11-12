@@ -16,6 +16,13 @@
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   }
+  /** Show the sidebar section for the current offseason step (used after loading a save). */
+  window.applyPhaseLayout = function () {
+    var step = window.gmPhase === 'offseason' ? league.offseasonStep : null;
+    (step === 'free-agency' ? showSection : hideSection)('section-free-agency');
+    (step === 'draft' ? showSection : hideSection)('section-draft');
+  };
+
   function phaseCard(title, sub, body, buttons) {
     /* Renders a styled "phase announcement" card in #main */
     var btns = buttons
@@ -423,6 +430,7 @@
        CPU signings happen when free agency closes (beginDraftPhase). */
 
     /* Unlock FA section in sidebar */
+    league.offseasonStep = 'free-agency';
     showSection('section-free-agency');
 
     /* Navigate to FA screen */
@@ -447,11 +455,13 @@
     if (typeof cpuRosterCleanup === 'function') cpuRosterCleanup();
 
     /* Hide FA section, show Draft section */
+    league.offseasonStep = 'draft';
     hideSection('section-free-agency');
     showSection('section-draft');
 
     /* Calculate draft order + generate class */
     if (typeof calculateDraftOrder === 'function') calculateDraftOrder();
+    window._customDraftImported = null; /* a new class each year */
     if (typeof generateDraftClass === 'function') generateDraftClass();
 
     var _importBadge = window._customDraftImported
@@ -470,10 +480,12 @@
       'background:rgba(22,163,74,.12);border-color:var(--accent);color:var(--accent2)">' +
       '📂 Upload Custom Draft Class' +
       '</button>' +
-      '<input type="file" id="_draftPhaseFileInput" accept=".csv" style="display:none" ' +
+      '<input type="file" id="_draftPhaseFileInput" accept=".csv,.tsv,.txt" style="display:none" ' +
       'onchange="window.importCustomDraftClass(this.files[0]);this.value=\'\'">' +
       '</div>' +
-      (_importBadge ? '<div style="font-size:12px;color:var(--accent2)">' + _importBadge + '</div>' : '');
+      '<div id="_draftImportBadge" style="font-size:12px;color:var(--accent2)">' +
+      (_importBadge || '') +
+      '</div>';
 
     var html = phaseCard('🎯 NFL Draft', 'The draft order has been set. Worst record picks first.', _draftBody, [
       { label: '📋 View Draft Order', fn: 'renderDraftOrder()' },
@@ -586,6 +598,7 @@
     updateWeekLabel();
 
     /* Hide offseason sections */
+    league.offseasonStep = null;
     hideSection('section-free-agency');
     hideSection('section-draft');
 

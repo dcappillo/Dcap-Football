@@ -23,6 +23,7 @@
   "js/coaching/coach-development.js",
   "js/coaching/coach-regression-safeguard.js",
   "js/coaching/black-monday.js",
+  "js/game/player-csv.js",
   "js/offseason/offseason-pipeline.js",
   "js/offseason/team-needs.js",
   "js/awards/awards-ui.js",

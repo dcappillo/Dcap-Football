@@ -45,8 +45,11 @@ function makeDeterministic(window, seed, timers, alerts) {
   window.HTMLAnchorElement.prototype.click = () => {};
 }
 
-/** Load the game, start a new league as the team at `teamIndex`, and return driving helpers. */
-async function startGame({ seed, teamIndex = 5 }) {
+/**
+ * Load the game, start a new league as the team at `teamIndex`, and return driving helpers.
+ * `beforeCoachSaved(run)` runs on the coach-creation screen, where roster imports happen.
+ */
+async function startGame({ seed, teamIndex = 5, beforeCoachSaved }) {
   const errors = [];
   const alerts = [];
   const timers = [];
@@ -85,6 +88,7 @@ async function startGame({ seed, teamIndex = 5 }) {
   run('_doStartNewGame()');
   run(`renderCoachCreation(Object.keys(teamMap)[${teamIndex}])`);
   window.document.getElementById('coachNameInput').value = 'Test Coach';
+  if (beforeCoachSaved) beforeCoachSaved(run); // e.g. import a roster on the coach screen
   run('saveNewCoach()');
 
   return { window, run, click, errors, alerts };

@@ -183,7 +183,7 @@
     });
   };
 
-  /* ── 7. Auto-init picks on game start and after load ─────────── */
+  /* ── 7. Auto-init picks on game start (save/load calls initDraftPicks itself) ── */
   var _origIPHC = window.initPhase4Core;
   window.initPhase4Core = function () {
     if (typeof _origIPHC === 'function') _origIPHC();
@@ -194,15 +194,6 @@
   };
 
   /* Re-init after save/load */
-  var _origDL = window._doLoad;
-  window._doLoad = function (slotIdx) {
-    if (typeof _origDL === 'function') _origDL(slotIdx);
-    setTimeout(function () {
-      if (!window.pickRegistry) window.pickRegistry = {};
-      window.initDraftPicks();
-    }, 400);
-  };
-
   /* Re-init at start of each new season */
   var _origBNS = window.beginNewSeason;
   window.beginNewSeason = function () {
