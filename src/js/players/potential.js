@@ -134,8 +134,32 @@ function rerollPotentialForUpgrade(player) {
 }
 
 /**
+ * Recalculate athleticism / intelligence / toughness / discipline from the
+ * granular attributes. Scheme fit, injury risk and trade value read these,
+ * so they must follow every attribute change.
+ */
+function refreshComposites(player) {
+  if (!player.granularAttrs || typeof window.deriveComposites !== 'function') return;
+  var comp = window.deriveComposites(player.granularAttrs);
+  player.attributes.athleticism = comp.athleticism;
+  player.attributes.intelligence = comp.intelligence;
+  player.attributes.toughness = comp.toughness;
+  player.attributes.discipline = comp.discipline;
+}
+
+/** Refresh composites for every player in the game (old saves carry stale values). */
+function refreshAllComposites() {
+  if (typeof league === 'undefined' || !league) return;
+  listAllTeams(league).forEach(function (team) {
+    team.roster.forEach(refreshComposites);
+  });
+  if (typeof freeAgents !== 'undefined' && Array.isArray(freeAgents)) freeAgents.forEach(refreshComposites);
+}
+
+/**
  * Move a player's overall by delta, keeping his granular attributes in step
- * (only attributes central to his position move, preserving his profile).
+ * (only attributes central to his position move, preserving his profile),
+ * and the composite ratings in step with the attributes.
  */
 function shiftOverall(player, delta) {
   if (!delta) return;
@@ -147,6 +171,7 @@ function shiftOverall(player, delta) {
         player.granularAttrs[k] = Math.max(20, Math.min(99, player.granularAttrs[k] + delta));
       }
     });
+    refreshComposites(player);
   }
 }
 

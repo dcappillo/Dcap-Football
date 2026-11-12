@@ -23,6 +23,20 @@ async function playSeason({ seed, teamIndex }) {
   run('beginPlayoffsPhase()');
   for (let round = 0; round < 4; round++) click('btnSimWeek');
 
+  // Composite ratings follow the attributes after a season of growth
+  const staleComposites = window.eval(`(function () {
+    var stale = 0;
+    listAllTeams(league).forEach(function (t) {
+      t.roster.forEach(function (p) {
+        if (!p.granularAttrs) return;
+        var c = deriveComposites(p.granularAttrs);
+        if (c.athleticism !== p.attributes.athleticism || c.intelligence !== p.attributes.intelligence ||
+            c.toughness !== p.attributes.toughness || c.discipline !== p.attributes.discipline) stale++;
+      });
+    });
+    return stale;
+  })()`);
+
   const endOfSeason = JSON.parse(
     window.eval(`JSON.stringify(listAllTeams(league).map(function (t) {
       return {
@@ -83,11 +97,14 @@ async function playSeason({ seed, teamIndex }) {
     })
   })`);
   window.close();
-  return { errors, alerts, snapshot, endOfSeason, rosterCheck, yearTwoWeeks };
+  return { errors, alerts, snapshot, endOfSeason, rosterCheck, yearTwoWeeks, staleComposites };
 }
 
 test('a full season and offseason play through without errors', async () => {
-  const { errors, snapshot, endOfSeason, rosterCheck, yearTwoWeeks } = await playSeason({ seed: 12345, teamIndex: 5 });
+  const { errors, snapshot, endOfSeason, rosterCheck, yearTwoWeeks, staleComposites } = await playSeason({
+    seed: 12345,
+    teamIndex: 5,
+  });
   assert.deepEqual(errors, []);
   const state = JSON.parse(snapshot);
   assert.equal(state.year, 2);
@@ -101,6 +118,8 @@ test('a full season and offseason play through without errors', async () => {
     assert.deepEqual(team.missing, [], `${team.id} is missing starters`);
   }
   assert.equal(yearTwoWeeks, 3, 'year two should play');
+
+  assert.equal(staleComposites, 0, 'composite ratings should match the attributes');
 
   // Morale and chemistry are live: every player has morale, and chemistry tracks results.
   for (const team of endOfSeason) assert.equal(team.moraleMissing, 0);

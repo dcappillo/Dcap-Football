@@ -371,6 +371,7 @@
     /* Fill in anything older saves are missing */
     ensureMoraleAndChemistry();
     ensureLeaguePotential();
+    refreshAllComposites();
     if (!window.pickRegistry) window.pickRegistry = {};
     window.initDraftPicks();
     if (
