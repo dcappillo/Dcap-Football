@@ -112,6 +112,17 @@
 
   /* ── Phase 1: Awards ─────────────────────────────────── */
   window.beginAwardsPhase = function () {
+    /* Close out the season exactly once. Re-entering this screen (the
+       main button, a reloaded save) only shows the awards again. Stored on
+       the league so it survives save/load. */
+    var year = window.simYear || 1;
+    if (league.seasonClosedYear !== year) {
+      league.seasonClosedYear = year;
+      /* Development first, so awards show updated ratings */
+      window.runEndOfSeasonProgression();
+      window.accumulateCareerStats();
+    }
+
     if (typeof renderAwards === 'function') renderAwards();
     /* Append a "Continue" button after awards render */
     setTimeout(function () {
@@ -398,6 +409,13 @@
   /* ── Phase 3: Free Agency ────────────────────────────── */
   window.beginFreeAgencyPhase = function () {
     /* Process contract expirations + generate FA pool */
+    var faYear = window.simYear || 1;
+    if (league.freeAgencyOpenedYear === faYear) {
+      renderFreeAgencyScreen();
+      return;
+    }
+    league.freeAgencyOpenedYear = faYear;
+
     if (typeof processContractExpirations === 'function') processContractExpirations();
     if (typeof generateFreeAgentPool === 'function') generateFreeAgentPool();
     ensureMoraleAndChemistry(); /* new free agents need a morale value for signing interest */

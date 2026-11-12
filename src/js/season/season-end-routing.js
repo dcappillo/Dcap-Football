@@ -85,6 +85,9 @@
     old.parentNode.replaceChild(btn, old);
 
     btn.addEventListener('click', function () {
+      /* Offseason steps have their own buttons (FA, draft) */
+      if (window.gmPhase === 'offseason') return;
+
       /* ── Roster validity check (blocks sim if team isn't ready) ── */
       var rosterErr = checkRosterBeforeSim();
       if (rosterErr) {

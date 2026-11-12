@@ -298,6 +298,15 @@
         '</div>' +
         '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">OVR</div>' +
         '</div>' +
+        '<div style="flex:1;text-align:center;background:var(--surface2);border-radius:8px;padding:8px" ' +
+        'title="Highest overall he can reach. A dev-trait upgrade re-rolls it.">' +
+        '<div style="font-size:26px;font-weight:700;color:' +
+        ovrColor(ensurePotential(p)) +
+        '">' +
+        p.potential +
+        '</div>' +
+        '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">POT</div>' +
+        '</div>' +
         '<div style="flex:1;text-align:center;background:var(--surface2);border-radius:8px;padding:8px">' +
         '<div style="font-size:14px;font-weight:600;color:' +
         devColor +
@@ -505,12 +514,6 @@
         });
       });
     });
-  };
-
-  var _bap = window.beginAwardsPhase;
-  window.beginAwardsPhase = function () {
-    window.accumulateCareerStats();
-    if (typeof _bap === 'function') _bap();
   };
 
   /* ── Wire up on load ──────────────────────────────────── */

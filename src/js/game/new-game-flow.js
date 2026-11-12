@@ -348,6 +348,7 @@ window.saveNewCoach = function () {
 
   ensureMoraleAndChemistry();
   stampRosterContinuity();
+  initializeLeaguePotential();
 
   /* Recompute power with new coach */
   team.powerRating = computeTeamPowerRating(team);

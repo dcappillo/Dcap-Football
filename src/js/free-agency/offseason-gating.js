@@ -16,7 +16,20 @@
    ============================================================ */
 (function () {
   /* Default to 'season' — offseason is unlocked by the pipeline */
-  window.gmPhase = window.gmPhase || 'season';
+  /* gmPhase is mirrored to <body data-phase> so styles can react to it
+     (the main season button is hidden during the offseason). */
+  var phase = window.gmPhase || 'season';
+  Object.defineProperty(window, 'gmPhase', {
+    configurable: true,
+    get: function () {
+      return phase;
+    },
+    set: function (value) {
+      phase = value;
+      if (document.body) document.body.dataset.phase = value;
+    },
+  });
+  window.gmPhase = phase;
 
   /* ── Set offseason when FA phase opens ─────────────────── */
   var _prevBFAP = window.beginFreeAgencyPhase;

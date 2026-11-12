@@ -1,11 +1,9 @@
 /* ============================================================
-   COMPLETE PLAYER DEVELOPMENT SYSTEM (GROUND-UP REWRITE)
-
-   Problem: runEndOfSeasonDevelopment, calculatePerformanceGrowth,
-   and 5 other helper functions were called but NEVER defined —
-   the entire system was a stub. runEndOfSeasonProgression was
-   also never called by the awards pipeline. This patch defines
-   everything from scratch and wires it into beginAwardsPhase.
+   END-OF-SEASON DEVELOPMENT
+   Dev-trait upgrades from season stats, aging and age decline,
+   and Potential re-rolls for upgraded players. Runs once per
+   season from beginAwardsPhase. Also: season-start OVR snapshots
+   and the roster screen with OVR deltas.
    ============================================================ */
 (function () {
   /* ── Dev trait upgrade check ────────────────────────────── */
@@ -55,45 +53,11 @@
         break;
     }
 
-    if (qualified) player.devTrait = DEV[cur + 1];
-  }
-
-  /* ── Season minimum guarantee ─────────────────────────────
-     Safety net: if a young player ended the season below their
-     guaranteed minimum OVR gain, bring them up to the floor.
-     This catches edge cases (mid-season load, first season etc.)
-
-     Minimums per age + dev trait (matches accumulator math):
-       ≤23 Normal=+4, Star=+6, Superstar=+7, X-Factor=+9
-       ≤25 Normal=+4, Star=+5, Superstar=+6, X-Factor=+8
-       ≤27 Normal=+2, Star=+3, Superstar=+4, X-Factor=+5
-       ≤29 Normal=+0 (needs playing time)
-       30+  → no minimum (regression possible)               */
-  function minimumSeasonGrowth(p) {
-    var age = p.age;
-    if (age >= 30) return 0; /* vets: no minimum */
-    /* Use window.devMult if available, otherwise inline the calculation */
-    var dm =
-      typeof window.devMult === 'function'
-        ? window.devMult(p)
-        : (function (t) {
-            return t === 'X-Factor' ? 2.0 : t === 'Superstar' ? 1.6 : t === 'Star' ? 1.3 : 1.0;
-          })(p.devTrait || 'Normal');
-    if (age <= 23) return Math.floor(0.28 * dm * 17);
-    else if (age <= 25) return Math.floor(0.24 * dm * 17);
-    else if (age <= 27) return Math.floor(0.14 * dm * 17);
-    else return 0;
-  }
-
-  function applySeasonMinimumGrowth(p) {
-    if (!p.seasonStartOVR) return;
-    var minGain = minimumSeasonGrowth(p);
-    if (minGain <= 0) return;
-    var actual = p.attributes.overall - p.seasonStartOVR;
-    if (actual < minGain) {
-      var boost = minGain - actual;
-      p.attributes.overall = Math.min(99, p.attributes.overall + boost);
-    }
+    if (!qualified || (player.age || 0) > DEV_UPGRADE_MAX_AGE) return false;
+    var next = DEV[cur + 1];
+    if (Math.random() >= DEV_UPGRADE_CHANCE[next]) return false;
+    player.devTrait = next;
+    return true;
   }
 
   /* Ensure coach baselines are set before development runs */
@@ -118,26 +82,19 @@
     if (typeof recalcAllTeamCap === 'function') recalcAllTeamCap();
     listAllTeams(league).forEach(function (team) {
       team.roster.forEach(function (p) {
-        applySeasonMinimumGrowth(p); /* enforce minimum OVR gain */
-        checkDevUpgrade(p, team); /* dev trait upgrade check  */
-        p.age++; /* age every player one year */
-        p.devAccum = 0; /* reset accumulator          */
+        ensurePotential(p);
+        var upgraded = checkDevUpgrade(p, team);
+        p.age++;
+        applyAgeDecline(p);
+        /* A new dev trait re-rolls Potential from the new trait, overall and age */
+        if (upgraded) rerollPotentialForUpgrade(p);
+        p.devAccum = 0;
       });
     });
   };
 
   window.runEndOfSeasonProgression = function () {
     window.runEndOfSeasonDevelopment();
-  };
-
-  /* ── Wire into the awards pipeline ─────────────────────────
-     beginAwardsPhase is the first thing called after the season.
-     Development runs HERE — before awards display — so players
-     already have their updated ratings when the user sees them. */
-  var _prevBAP = window.beginAwardsPhase;
-  window.beginAwardsPhase = function () {
-    window.runEndOfSeasonProgression();
-    if (typeof _prevBAP === 'function') _prevBAP();
   };
 
   /* ── seasonStartOVR — captured once per season ───────────── */
@@ -242,6 +199,11 @@
           ovr +
           dHtml +
           '</td>' +
+          '<td style="color:' +
+          ovrColor(ensurePotential(p)) +
+          '">' +
+          p.potential +
+          '</td>' +
           '<td>' +
           yrs +
           'yr</td>' +
@@ -288,7 +250,7 @@
         ' &nbsp;·&nbsp; <span style="color:#4ade80">(+n)</span>/<span style="color:#f87171">(-n)</span> OVR change' +
         '</p>' +
         '<table><thead><tr>' +
-        '<th>#</th><th>Name</th><th>Pos</th><th>Age</th><th>OVR</th><th>Yrs</th><th>Cap Hit</th>' +
+        '<th>#</th><th>Name</th><th>Pos</th><th>Age</th><th>OVR</th><th title="Potential: highest overall he can reach">POT</th><th>Yrs</th><th>Cap Hit</th>' +
         '</tr></thead><tbody>' +
         rows +
         '</tbody></table>',

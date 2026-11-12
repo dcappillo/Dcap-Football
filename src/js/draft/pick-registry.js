@@ -409,6 +409,11 @@
           '">' +
           p.attributes.overall +
           '</td>' +
+          '<td style="color:' +
+          ovrColor(ensurePotential(p)) +
+          '">' +
+          p.potential +
+          '</td>' +
           '<td><button onclick="userDraftPlayer(\'' +
           p.id +
           '\')" ' +
@@ -674,7 +679,7 @@
         '<div id="_draftPosTabs" style="overflow-x:auto;white-space:nowrap;padding:0 0 8px;' +
         '-webkit-overflow-scrolling:touch;scrollbar-width:thin"></div>' +
         '<table><thead><tr>' +
-        '<th>#</th><th>Name</th><th>Pos</th><th>Age</th><th>OVR</th><th></th>' +
+        '<th>#</th><th>Name</th><th>Pos</th><th>Age</th><th>OVR</th><th title="Potential: highest overall he can reach">POT</th><th></th>' +
         '</tr></thead>' +
         '<tbody id="_draftTbody"></tbody></table>',
     );

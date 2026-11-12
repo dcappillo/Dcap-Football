@@ -1,18 +1,18 @@
 /* ============================================================
-   COMPREHENSIVE PLAYER PROGRESSION (FULL REWRITE)
+   WEEKLY PLAYER GROWTH
 
-   Changes from previous version:
-   • Minimum baseline progression for ALL players every week
-     (even bench warmers learn in practice)
-   • Baseline scaled by age + dev trait (not just performance)
-   • Performance bonus is ADDITIVE on top of baseline
-   • RB scoring: lower yard threshold, higher TD weight
-   • CB/S scoring: tackles now major contributor, not just INTs
-   • OL scoring: based on games started, not runaway numbers
-   • Floor fix: only blocks DROPS below seasonStartOVR,
-     never blocks gains (previous logic would zero out +1
-     if player ever dipped below their start OVR)
-   • Dev trait multiplier on baseline AND performance
+   After every simulated week, each player under his Potential
+   grows a little. How much depends on:
+     • age          — young players grow fastest (seasonGrowthForAge)
+     • dev trait    — Star 1.3×, Superstar 1.6×, X-Factor 2×
+     • room to grow — growth slows over the last 5 points below
+                      Potential and stops at it
+     • elite zone   — growth slows to 75% at 90+ overall
+     • playing time — players who didn't play this week grow at half speed
+     • performance  — strong weekly production adds a bonus
+
+   Players never decline during the season; aging is applied once
+   at the end of the season (see players/potential.js).
    ============================================================ */
 (function () {
   /* ── Dev trait multiplier ─────────────────────────────── */
@@ -22,14 +22,6 @@
   }
   /* Expose globally so other script blocks can call it */
   window.devMult = devMult;
-
-  /* ── OVR-relative gain multiplier ────────────────────────
-     Lower OVR players benefit more from the same performance.
-     OVR 60→1.67× | OVR 70→1.33× | OVR 80→1.0×
-     OVR 85→0.83× | OVR 90→0.67× | OVR 95→0.50×           */
-  function ovrGainMult(ovr) {
-    return Math.max(0.15, Math.min(2.5, 1.0 + (80 - ovr) / 30));
-  }
 
   /* ── Position-aware performance score (per-game average) ─
      All scores calibrated so:
@@ -109,138 +101,54 @@
     }
   }
 
-  /* ── Weekly progression — accumulator model ──────────────
-     Every player has a devAccum bucket that fills each week.
-     When it reaches 1.0 they gain +1 OVR. Remainder carries
-     over so no week is ever wasted.
+  window.weeklyPerfScore = weeklyPerfScore;
 
-     Layer 1 — GUARANTEED baseline (deterministic, no RNG):
-       Each week adds a fixed amount to devAccum.
-       Young players fill the bucket in ≤17 weeks guaranteed.
-       Calibrated so age ≤23 Normal always gets at least +1.
+  var WEEKS_PER_SEASON = 17;
 
-     Layer 2 — Performance bonus (additive on top of baseline,
-       scales with game quality, still uses ovrGainMult so
-       high-OVR stars develop slower than raw prospects).
+  /* Growth accumulates in p.devAccum; each full 1.0 becomes +1 overall. */
+  function progressPlayerWeek(p) {
+    ensurePotential(p);
+    var s = p.stats || {};
+    var room = p.potential - p.attributes.overall;
 
-     Layer 3 — Age regression (subtracts from the bucket for
-       vets; can drive OVR below season floor for 30+).      */
-  function progressTeamWeek(team) {
-    team.roster.forEach(function (p) {
-      var s = p.stats || {};
-      var age = p.age;
-      var ovr = p.attributes.overall;
-      var dm = devMult(p);
-      var gm = ovrGainMult(ovr);
-      var floor = p.seasonStartOVR !== undefined ? p.seasonStartOVR : ovr;
+    /* Did he play this week? (gamesPlayed is season-to-date and resets each season) */
+    if ((s.gamesPlayed || 0) < (p._gpSeen || 0)) p._gpSeen = 0;
+    var played = (s.gamesPlayed || 0) > (p._gpSeen || 0);
+    p._gpSeen = s.gamesPlayed || 0;
 
-      /* Init accumulator */
-      if (p.devAccum === undefined) p.devAccum = 0;
+    if (room <= 0) {
+      p.devAccum = 0;
+      return;
+    }
 
-      /* ── Layer 1: Guaranteed baseline (no RNG) ──────────
-         baseRate × dm × 17 weeks = minimum OVR gain per season:
-           age ≤23  Normal   0.280 × 1.0 × 17 = 4.76 → +4 guaranteed
-           age ≤23  Star     0.280 × 1.3 × 17 = 6.19 → +6 guaranteed
-           age ≤23  Superstar 0.280 × 1.6 × 17= 7.62 → +7 guaranteed
-           age ≤23  X-Factor  0.280 × 2.0 × 17= 9.52 → +9 guaranteed
-           age ≤25  Normal   0.240 × 1.0 × 17 = 4.08 → +4 guaranteed
-           age ≤25  Star     0.240 × 1.3 × 17 = 5.30 → +5 guaranteed
-           age ≤27  Normal   0.140 × 1.0 × 17 = 2.38 → +2 guaranteed
-           age ≤29  Normal   0.048 × 1.0 × 17 = 0.82 → needs perf
-           age 30+  → 0, performance only
-         ovrGainMult NOT applied to baseline: high-OVR players
-         get the same minimum guarantee as raw prospects.       */
-      var baseRate = 0;
-      if (age <= 23) baseRate = 0.28;
-      else if (age <= 25) baseRate = 0.24;
-      else if (age <= 27) baseRate = 0.14;
-      else if (age <= 29) baseRate = 0.048;
-      /* 30+ → 0 */
+    var roomFactor = Math.min(1, room / 5);
+    /* The last steps to elite are the hardest */
+    var eliteFactor = p.attributes.overall >= 90 ? 0.75 : 1;
+    var dm = devMult(p);
+    var gain = (seasonGrowthForAge(p.age) / WEEKS_PER_SEASON) * (played ? 1 : 0.5);
 
-      p.devAccum += baseRate * dm;
+    if (played) {
+      var perf = weeklyPerfScore(p);
+      if (perf >= 1.2) gain += 0.1;
+      else if (perf >= 0.6) gain += 0.05;
+      else if (perf >= 0.3) gain += 0.02;
+    }
 
-      /* ── Layer 2: Performance bonus (uses ovrGainMult) ────
-         Starters who play well add more to the bucket.
-         Bench players only get baseline above.               */
-      if (s.gamesPlayed && s.gamesPlayed > 0) {
-        var perf = weeklyPerfScore(p);
-        var bonus = 0;
-        if (perf >= 1.2) bonus = 0.13;
-        else if (perf >= 0.6) bonus = 0.055;
-        else if (perf >= 0.3) bonus = 0.015;
-        p.devAccum += bonus * dm * gm;
-      }
+    p.devAccum = (p.devAccum || 0) + gain * dm * roomFactor * eliteFactor;
 
-      /* ── Layer 3: Age regression (subtracts from bucket) ──
-         Vets drain the bucket weekly; heavy enough drain means
-         they lose a point despite any baseline they had.      */
-      var regRate = 0;
-      if (age >= 36) regRate = 0.25;
-      else if (age >= 33) regRate = 0.15;
-      else if (age >= 30) regRate = 0.07;
-
-      if (regRate > 0) {
-        /* Elite play partially offsets regression */
-        if (s.gamesPlayed > 0 && weeklyPerfScore(p) >= 1.2) regRate *= 0.55;
-        p.devAccum -= regRate;
-      }
-
-      /* ── Apply accumulator ────────────────────────────────
-         Gain: when bucket ≥ 1.0, award +1 and subtract 1.0
-           (carry over remainder — no wasted accumulation).
-         Loss: when bucket ≤ -1.0, apply -1 and add 1.0.
-         Floor: young/prime players (age ≤29) cannot drop
-           below their season-start OVR from regression alone. */
-      var delta = 0;
-
-      while (p.devAccum >= 1.0) {
-        delta++;
-        p.devAccum -= 1.0;
-      }
-
-      while (p.devAccum <= -1.0) {
-        var drop = -1;
-        /* Enforce floor for young players */
-        if (age <= 29 && ovr + delta + drop < floor) {
-          drop = 0;
-          p.devAccum = -0.99;
-        }
-        delta += drop;
-        p.devAccum += 1.0;
-      }
-
-      if (delta !== 0) {
-        var newOvr = Math.max(40, Math.min(99, ovr + delta));
-        p.attributes.overall = newOvr;
-
-        /* ── Keep granularAttrs in sync with OVR drift ───────
-           When OVR rises or falls, nudge every granular attr by
-           the same delta so the two don't permanently diverge.
-           We only move attrs that are in the player's primary
-           position bias (bias > 0.5) to preserve position
-           identity — secondary attrs stay unchanged.           */
-        if (p.granularAttrs && window.POS_BIAS && p.positions && p.positions[0]) {
-          var bias = window.POS_BIAS[p.positions[0]] || {};
-          var gAttrs = p.granularAttrs;
-          Object.keys(gAttrs).forEach(function (k) {
-            var b = bias[k] !== undefined ? bias[k] : 0;
-            if (b >= 0.5) {
-              gAttrs[k] = Math.max(20, Math.min(99, gAttrs[k] + delta));
-            }
-          });
-        }
-      }
-    });
+    var delta = 0;
+    while (p.devAccum >= 1 && delta < room) {
+      delta++;
+      p.devAccum -= 1;
+    }
+    shiftOverall(p, delta);
   }
 
-  /* ── Wrap simulateWeek ──────────────────────────────────── */
   var _origSW = window.simulateWeek;
   window.simulateWeek = function (week, teamMap, userStrategy, userTeamId) {
     if (typeof _origSW === 'function') _origSW(week, teamMap, userStrategy, userTeamId);
-    if (typeof league !== 'undefined' && league && typeof listAllTeams === 'function') {
-      listAllTeams(league).forEach(function (team) {
-        progressTeamWeek(team);
-      });
-    }
+    listAllTeams(league).forEach(function (team) {
+      team.roster.forEach(progressPlayerWeek);
+    });
   };
 })();

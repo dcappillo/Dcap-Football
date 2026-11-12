@@ -855,3 +855,8 @@ tr:hover td {
   opacity: 1;
   color: var(--accent2);
 }
+
+/* The season/playoff button has no job during the offseason; FA and the draft have their own controls */
+body[data-phase='offseason'] #btnSimWeek {
+  display: none;
+}

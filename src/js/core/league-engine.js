@@ -173,6 +173,9 @@ function generateRandomName() {
   return randomChoice(first) + ' ' + randomChoice(last);
 }
 
+var ROOKIE_TARGET_MEAN = 64;
+var ROOKIE_TARGET_SPREAD = 8.5;
+
 function _generateAttrsGranular(pos, tier) {
   /* Normalise position to POS_BIAS key */
   /* Normalise to a POS_BIAS key — T/G/C now have their own entries */
@@ -196,11 +199,13 @@ function _generateAttrsGranular(pos, tier) {
   /* Pick a target OVR for this player tier */
   var targetOVR;
   if (tier === 'rookie') {
-    /* Normal distribution: mean=72, std=6 → rookies cluster 60-84 */
+    /* Normal distribution around ROOKIE_TARGET_MEAN (std ROOKIE_TARGET_SPREAD). Rookies enter
+       below the league average and grow toward their Potential; set higher,
+       every draft class raised the league average (see tests/balance.test.js). */
     var u1 = Math.random(),
       u2 = Math.random();
     var z = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
-    targetOVR = Math.max(50, Math.min(96, Math.round(72 + z * 6)));
+    targetOVR = Math.max(50, Math.min(96, Math.round(ROOKIE_TARGET_MEAN + z * ROOKIE_TARGET_SPREAD)));
   } else {
     /* Veterans: broad spread 60-95 */
     targetOVR = randomInt(60, 95);

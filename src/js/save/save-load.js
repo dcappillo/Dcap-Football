@@ -312,6 +312,7 @@
     if (si && league) si.textContent = league.name + ' · Season ' + (window.simYear || 1);
 
     ensureMoraleAndChemistry();
+    ensureLeaguePotential();
     return true;
   }
 

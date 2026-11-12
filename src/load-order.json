@@ -37,6 +37,7 @@
   "js/roster/player-detail-and-picks.js",
   "js/ui/home-navigation.js",
   "js/free-agency/fa-fixes-and-ovr-delta.js",
+  "js/players/potential.js",
   "js/players/development-system.js",
   "js/players/weekly-progression.js",
   "js/roster/multi-position-depth-chart.js",

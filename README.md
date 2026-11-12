@@ -90,4 +90,13 @@ One rule that follows from concatenating everything into a single script: don't 
 
 ## Testing
 
-`npm test` loads the production build in [jsdom](https://github.com/jsdom/jsdom) with a seeded random number generator and plays new game → 17 weeks → playoffs → Black Monday → free agency → draft → next season. It fails on any uncaught error and checks that the same seed always produces the same league. CI runs it on every push, so a broken build never deploys.
+`npm test` builds the game, then runs two kinds of headless tests in [jsdom](https://github.com/jsdom/jsdom) with a seeded random number generator:
+
+- **Smoke test** (`tests/smoke.test.js`): new game → 17 weeks → playoffs → Black Monday → free agency → draft → next season. Fails on any uncaught error, checks CPU rosters survive the offseason, and checks that the same seed always produces the same league.
+- **Balance test** (`tests/balance.test.js`): plays ten full seasons and fails if the league's average rating drifts more than 2.5 points or the number of 90+ players leaves its target range. Run it after touching player development, the draft or free agency.
+
+CI runs both on every push, so a broken build never deploys.
+
+## Player development
+
+Every player has a **Potential**, the highest overall he can reach (`src/js/players/potential.js`). Players grow during the season: fastest when young, starting and productive, slower as they near their Potential, and not at all once they reach it. A development-trait upgrade (Star → Superstar → X-Factor, earned from season stats) re-rolls Potential from the new trait, current overall and age. Players 30 and older decline once a year at the end of the season.
