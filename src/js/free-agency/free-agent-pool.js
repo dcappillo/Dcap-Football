@@ -15,32 +15,38 @@ let freeAgents = [];
    - Random market players
 ------------------------------------------------------------ */
 
-function generateFreeAgentPool() {
-  freeAgents = [];
+/** A generated veteran for the open market. */
+function generateMarketPlayer(pos) {
+  return {
+    id: 'fa_' + globalPlayerId++,
+    name: generateRookieName(),
+    positions: [pos],
+    age: randomInt(23, 32),
+    attributes: generateRookieAttributes(pos),
+    contract: null,
+    stats: defaultPlayerStats(),
+    isFreeAgent: true,
+  };
+}
 
-  // 1. Undrafted rookies (from draft class)
-  const undrafted = draftClass.filter((p) => !p.drafted);
-  undrafted.forEach((p) => {
+/**
+ * Add undrafted rookies and generated veterans to the market. Players
+ * already in the pool (expired contracts, releases) stay in it.
+ */
+function generateFreeAgentPool() {
+  const inPool = new Set(freeAgents.map((p) => p.id));
+  const add = (p) => {
+    if (inPool.has(p.id)) return;
     p.isFreeAgent = true;
     freeAgents.push(p);
-  });
+    inPool.add(p.id);
+  };
 
-  // 2. Random market players (to keep FA pool interesting)
-  for (let i = 0; i < 40; i++) {
-    const pos = generateRookiePosition();
-    const attributes = generateRookieAttributes(pos);
+  // 1. Undrafted rookies (from draft class)
+  draftClass.filter((p) => !p.drafted).forEach(add);
 
-    freeAgents.push({
-      id: 'fa_' + globalPlayerId++,
-      name: generateRookieName(),
-      positions: [pos],
-      age: randomInt(23, 32),
-      attributes,
-      contract: null,
-      stats: defaultPlayerStats(),
-      isFreeAgent: true,
-    });
-  }
+  // 2. Generated market players (to keep FA pool interesting)
+  for (let i = 0; i < 40; i++) add(generateMarketPlayer(generateRookiePosition()));
 }
 
 /* ------------------------------------------------------------

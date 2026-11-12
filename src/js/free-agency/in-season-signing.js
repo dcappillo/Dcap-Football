@@ -101,6 +101,10 @@
             ? ' <span style="font-size:9px;color:#facc15">' + p.devTrait + '</span>'
             : '';
         var age = p.age || '—';
+        var former =
+          p.previousTeamId === userTeamId
+            ? ' <span style="font-size:9px;color:#60a5fa;border:1px solid #60a5fa;border-radius:4px;padding:0 4px">Your FA</span>'
+            : '';
         var capHit = mv.capHitPerYear ? '$' + mv.capHitPerYear.toLocaleString() + '/yr' : '—';
 
         /* Offer button — always active now */
@@ -116,6 +120,7 @@
           '<td>' +
           p.name +
           dev +
+          former +
           '</td>' +
           '<td>' +
           p.positions[0] +
@@ -139,11 +144,26 @@
       })
       .join('');
 
+    /* Your own players whose contracts just expired are in this pool */
+    var formerCount = pool.filter(function (p) {
+      return p.previousTeamId === userTeamId;
+    }).length;
+    var formerBanner =
+      isOffseason && formerCount
+        ? '<div style="background:rgba(96,165,250,.08);border:1px solid #60a5fa;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px">' +
+          '<strong>' +
+          formerCount +
+          ' of your players</strong> hit free agency when their contracts expired. They are marked ' +
+          '<span style="color:#60a5fa">Your FA</span> below. ' +
+          'You need at least 37 players and every position filled to start the season.</div>'
+        : '';
+
     var emptyMsg = '<p style="color:var(--muted2);font-size:13px">No free agents currently available.</p>';
 
     setMainContent(
       '<h2>Free Agents</h2>' +
         (isOffseason ? offseasonBanner() : inSeasonBanner()) +
+        formerBanner +
         (pool.length
           ? '<table><thead><tr>' +
             '<th>Name</th><th>Pos</th><th>Age</th><th>OVR</th><th>Est. Value</th><th>Sign</th>' +

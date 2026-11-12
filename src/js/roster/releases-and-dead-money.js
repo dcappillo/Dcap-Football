@@ -138,3 +138,72 @@ function cpuRosterCleanup() {
     }
   });
 }
+
+/* ------------------------------------------------------------
+   CPU Roster Completion
+   Before each season, make sure every CPU team can field a full
+   lineup with backups and carries a realistic roster size.
+   Signs the best available free agent at each short position,
+   or a generated veteran if the market has none.
+------------------------------------------------------------ */
+
+var CPU_ROSTER_TARGET = 53;
+
+/** Players a CPU team wants at each position (starters plus backups). */
+var CPU_DEPTH_TARGET = {
+  QB: 3,
+  RB: 4,
+  WR: 6,
+  TE: 3,
+  T: 4,
+  G: 4,
+  C: 2,
+  EDGE: 5,
+  DT: 5,
+  LB: 6,
+  CB: 6,
+  FS: 2,
+  SS: 2,
+  K: 1,
+  P: 1,
+};
+
+function cpuSignForDepth(team, pos) {
+  const best = freeAgents
+    .filter((p) => p.positions[0] === pos)
+    .sort((a, b) => b.attributes.overall - a.attributes.overall)[0];
+  const player = best || generateMarketPlayer(pos);
+  if (best) freeAgents = freeAgents.filter((p) => p.id !== best.id);
+
+  // Depth signings are one-year deals; minimum salary keeps capped-out teams legal
+  const mv = calculateMarketValue(player);
+  const salary = team.capUsed + mv.capHitPerYear <= team.salaryCap ? mv.capHitPerYear : 750000;
+  player.contract = { years: 1, totalValue: salary, capHitPerYear: salary };
+  player.isFreeAgent = false;
+  team.roster.push(player);
+  team.capUsed += salary;
+}
+
+function cpuCompleteRosters() {
+  listAllTeams(league).forEach((team) => {
+    if (team.id === userTeamId) return;
+
+    const count = (pos) => team.roster.filter((p) => p.positions[0] === pos).length;
+    const positions = Object.keys(CPU_DEPTH_TARGET);
+
+    // Every position covered: starters plus at least one backup
+    positions.forEach((pos) => {
+      const minimum = Math.min(CPU_DEPTH_TARGET[pos], (STARTER_SLOTS[pos] || 1) + 1);
+      while (count(pos) < minimum) cpuSignForDepth(team, pos);
+    });
+
+    // Fill toward a full roster at the thinnest positions
+    while (team.roster.length < CPU_ROSTER_TARGET) {
+      const neediest = positions
+        .map((pos) => ({ pos, gap: CPU_DEPTH_TARGET[pos] - count(pos) }))
+        .sort((a, b) => b.gap - a.gap)[0];
+      if (neediest.gap <= 0) break;
+      cpuSignForDepth(team, neediest.pos);
+    }
+  });
+}

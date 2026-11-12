@@ -551,6 +551,9 @@
     /* Run UDFA first — seeds undrafted rookies into the FA pool */
     if (typeof runUDFA === 'function') runUDFA();
 
+    /* CPU teams fill holes left by expirations before cuts */
+    if (typeof cpuCompleteRosters === 'function') cpuCompleteRosters();
+
     /* Run preseason roster cuts + morale/chemistry reset */
     if (typeof runPreseasonCuts === 'function') runPreseasonCuts();
     if (typeof resetMoraleAndChemistry === 'function') resetMoraleAndChemistry();

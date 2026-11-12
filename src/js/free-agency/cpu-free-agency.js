@@ -10,6 +10,9 @@ function cpuGenerateOffer(player, team) {
   const mv = calculateMarketValue(player);
   const needs = computeTeamNeeds(team);
 
+  // Full rosters don't bid
+  if (team.roster.length >= CPU_ROSTER_TARGET) return null;
+
   // CPU only bids if they need the position
   const needFactor = needs[player.positions[0]];
   if (needFactor < 1.0) return null;

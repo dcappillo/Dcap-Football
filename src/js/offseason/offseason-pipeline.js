@@ -19,6 +19,15 @@ function applyCapRollover() {
    4. Contract Expirations
 ------------------------------------------------------------ */
 
+/** Chance a CPU team re-signs one of its own expiring players. */
+function cpuResignChance(player) {
+  const ovr = player.attributes.overall;
+  let chance = ovr >= 80 ? 0.85 : ovr >= 72 ? 0.6 : ovr >= 65 ? 0.4 : 0.2;
+  if (player.age >= 33) chance *= 0.5;
+  else if (player.age >= 30) chance *= 0.8;
+  return chance;
+}
+
 function processContractExpirations() {
   const teams = listAllTeams(league);
 
@@ -26,7 +35,20 @@ function processContractExpirations() {
     const remaining = [];
 
     team.roster.forEach((player) => {
-      if (player.contract && player.contract.years <= 1) {
+      const expiring = player.contract && player.contract.years <= 1;
+
+      // CPU teams keep a share of their expiring players (the user re-signs from the roster screen)
+      if (expiring && team.id !== userTeamId && Math.random() < cpuResignChance(player)) {
+        const deal = generateContract(player.attributes.overall, player.age);
+        if (team.capUsed - player.contract.capHitPerYear + deal.capHitPerYear <= team.salaryCap) {
+          team.capUsed += deal.capHitPerYear - player.contract.capHitPerYear;
+          player.contract = deal;
+          remaining.push(player);
+          return;
+        }
+      }
+
+      if (expiring) {
         // Remove cap hit before releasing
         team.capUsed -= player.contract.capHitPerYear || 0;
         // Tag with previous team before releasing so re-signings screen can find them
@@ -378,8 +400,15 @@ function runPreseasonCuts() {
   const teams = listAllTeams(league);
 
   teams.forEach((team) => {
+    const count = (pos) => team.roster.filter((p) => p.positions[0] === pos).length;
+    // Never cut a position below its starting lineup (low-OVR kickers and punters were being cut)
+    const cuttable = (p) => count(p.positions[0]) > (STARTER_SLOTS[p.positions[0]] || 0);
+
     while (team.roster.length > 55) {
-      const cut = team.roster.sort((a, b) => a.attributes.overall - b.attributes.overall)[0];
+      const cut = team.roster.filter(cuttable).sort((a, b) => a.attributes.overall - b.attributes.overall)[0];
+      if (!cut) break;
+      team.capUsed -= cut.contract ? cut.contract.capHitPerYear || 0 : 0;
+      cut.isFreeAgent = true;
       freeAgents.push(cut);
       team.roster = team.roster.filter((p) => p.id !== cut.id);
     }

@@ -134,6 +134,29 @@ async function playSeason({ seed, teamIndex }) {
   `);
   run('beginNewSeason()');
 
+  const rosterCheck = JSON.parse(
+    window.eval(`JSON.stringify(listAllTeams(league).filter(function (t) { return t.id !== userTeamId; }).map(function (t) {
+      var missing = Object.keys(STARTER_SLOTS).filter(function (pos) {
+        return t.roster.filter(function (p) { return p.positions[0] === pos; }).length < STARTER_SLOTS[pos];
+      });
+      return { id: t.id, size: t.roster.length, missing: missing };
+    }))`),
+  );
+
+  // Fill the user's roster the way a player would in free agency, then play into year two
+  run(`
+    var team = teamMap[userTeamId];
+    Object.keys(STARTER_SLOTS).forEach(function (pos) {
+      while (team.roster.filter(function (p) { return p.positions[0] === pos; }).length < STARTER_SLOTS[pos] + 1) {
+        cpuSignForDepth(team, pos);
+      }
+    });
+    while (team.roster.length < 46) cpuSignForDepth(team, 'WR');
+  `);
+  const weekBefore = window.eval('currentWeekIndex');
+  for (let week = 0; week < 3; week++) click('btnSimWeek');
+  const yearTwoWeeks = window.eval('currentWeekIndex') - weekBefore;
+
   const snapshot = window.eval(`JSON.stringify({
     year: window.simYear,
     phase: window.gmPhase,
@@ -143,17 +166,24 @@ async function playSeason({ seed, teamIndex }) {
     })
   })`);
   window.close();
-  return { errors, alerts, snapshot, endOfSeason };
+  return { errors, alerts, snapshot, endOfSeason, rosterCheck, yearTwoWeeks };
 }
 
 test('a full season and offseason play through without errors', async () => {
-  const { errors, snapshot, endOfSeason } = await playSeason({ seed: 12345, teamIndex: 5 });
+  const { errors, snapshot, endOfSeason, rosterCheck, yearTwoWeeks } = await playSeason({ seed: 12345, teamIndex: 5 });
   assert.deepEqual(errors, []);
   const state = JSON.parse(snapshot);
   assert.equal(state.year, 2);
   assert.equal(state.phase, 'season');
   assert.equal(state.teams.length, 32);
   for (const [id, rosterSize] of state.teams) assert.ok(rosterSize > 0, `${id} has an empty roster`);
+
+  // CPU rosters survive the offseason: full size, every starting spot filled
+  for (const team of rosterCheck) {
+    assert.ok(team.size >= 46, `${team.id} has only ${team.size} players`);
+    assert.deepEqual(team.missing, [], `${team.id} is missing starters`);
+  }
+  assert.equal(yearTwoWeeks, 3, 'year two should play');
 
   // Morale and chemistry are live: every player has morale, and chemistry tracks results.
   for (const team of endOfSeason) assert.equal(team.moraleMissing, 0);
