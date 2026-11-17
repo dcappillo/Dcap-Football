@@ -1,5 +1,7 @@
 # CapFootball
 
+**Play it:** [luminous-begonia-f68904.netlify.app](https://luminous-begonia-f68904.netlify.app/)
+
 A 32-team football general manager simulation that runs entirely in the browser. You take over a franchise, hire a head coach, and run it season after season: weekly game simulation, depth charts, trades, free agency, contracts and the salary cap, coaching staffs and schemes, injuries, a week-by-week playoff bracket, Black Monday, and a 7-round draft.
 
 There is no backend. Everything runs client-side, and saves download as files you can load later.
@@ -25,17 +27,11 @@ Refresh the browser after a rebuild to see changes.
 | `npm run lint`   | ESLint                                                          |
 | `npm run format` | Prettier (`format:check` verifies without writing)              |
 
-## Deploying to GitHub Pages
+## CI and deploying
 
-The workflow in `.github/workflows/deploy.yml` lints, tests and builds every push and pull request. Pushes to `main` are then published to GitHub Pages.
+`.github/workflows/ci.yml` lints, checks formatting, tests and builds every push and pull request.
 
-One-time setup:
-
-1. Create a repository on GitHub and push this project to its `main` branch.
-2. In the repository, go to **Settings → Pages** and set **Source** to **GitHub Actions**.
-3. Push again, or re-run the workflow from the **Actions** tab.
-
-The game will be live at `https://<your-username>.github.io/<repo-name>/`. All asset paths are relative, so it works from a subpath. `dist/` is also a plain static site, so Netlify, Vercel or any static host works too (build command `npm run build`, publish directory `dist`).
+The live game is hosted on Netlify. `netlify.toml` tells it to run `npm run build` and publish `dist/`, so every push to `main` redeploys, and every pull request gets its own preview link. `dist/` is a plain static site with relative asset paths, so GitHub Pages, Vercel or any static host works too.
 
 ## Project layout
 
