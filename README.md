@@ -1,5 +1,7 @@
 # CapFootball
 
+**Play it:** [luminous-begonia-f68904.netlify.app](https://luminous-begonia-f68904.netlify.app/)
+
 A 32-team pro football GM sim that runs in your browser. Pick a franchise, hire a staff, build a roster, and live with the consequences for as many seasons as you can stand.
 
 ## What you do
