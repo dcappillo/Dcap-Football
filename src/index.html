@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>CapFootball — Football GM Simulator</title>
+  <meta name="description" content="A 32-team football general manager simulation that runs entirely in the browser." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+
+<header>
+  <button id="menuBtn" aria-label="Toggle menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="header-brand" onclick="typeof renderHome==='function'&&renderHome()" title="Home" style="cursor:pointer;user-select:none">
+    <h1>⚡ Football Sim</h1>
+    <div class="sub">Team Manager</div>
+  </div>
+  <div id="seasonInfo"></div>
+</header>
+
+<div id="overlay"></div>
+
+<!-- Drawer — id="sidebar" must stay for script compatibility -->
+<aside id="sidebar">
+  <div class="drawer-header">
+    <span class="title">Navigation</span>
+    <button id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body">
+
+    <div class="section" style="display:none">
+      <!-- Team select hidden — franchise set via New Game flow -->
+      <h2>Your Team</h2>
+      <label for="teamSelect">Select Team</label>
+      <select id="teamSelect"></select>
+      <div id="currentWeekLabel"></div>
+    </div>
+    <div class="section">
+      <div id="currentWeekLabel2"></div>
+    </div>
+
+    <div class="section">
+      <h2>Save / Load</h2>
+      <button id="btnSaveLoad" onclick="closeDrawer();renderSaveLoad()">💾 Save / Load Game</button>
+    </div>
+
+    <div class="section">
+      <h2>Weekly Gameplan</h2>
+      <label for="offPlaybook">Offensive Playbook</label>
+      <select id="offPlaybook">
+        <option value="West Coast">West Coast</option>
+        <option value="Air Raid">Air Raid</option>
+        <option value="Spread">Spread</option>
+        <option value="Power Run">Power Run</option>
+      </select>
+      <label for="offStyle">Offensive Style</label>
+      <select id="offStyle">
+        <option value="Run Heavy">Run Heavy</option>
+        <option value="Balanced" selected>Balanced</option>
+        <option value="Pass Heavy">Pass Heavy</option>
+      </select>
+      <label for="defPlaybook">Defensive Playbook</label>
+      <select id="defPlaybook">
+        <option value="4-3">4-3</option>
+        <option value="3-4">3-4</option>
+        <option value="Cover 2">Cover 2</option>
+        <option value="Blitz Heavy">Blitz Heavy</option>
+      </select>
+      <label for="defStyle">Defensive Style</label>
+      <select id="defStyle">
+        <option value="Defend Run">Defend Run</option>
+        <option value="Balanced" selected>Balanced</option>
+        <option value="Defend Pass">Defend Pass</option>
+        <option value="Blitz Heavy">Blitz Heavy</option>
+      </select>
+    </div>
+
+    <div class="section">
+      <h2>Actions</h2>
+      <button id="btnSimWeek">⚡ Simulate Week</button>
+      <button id="btnViewRoster">👥 View Roster</button>
+      <button id="btnDepthChart">📐 Depth Chart</button>
+      <button id="btnViewLeague" style="display:none">🏟️ League Overview</button>
+      <button id="btnViewStandings">📊 Standings</button>
+    </div>
+
+    <div class="section">
+      <h2>Stats</h2>
+      <button id="btnPlayerStats">📈 Player Stats</button>
+      <button id="btnTeamStats">📋 Team Stats</button>
+      <button id="btnLeagueLeaders">🏆 League Leaders</button>
+    </div>
+
+    <div class="section">
+      <h2>Awards</h2>
+      <button id="btnAwardCriteria">📝 Award Criteria</button>
+      <button id="btnAwards" style="display:none">Award Winners</button>
+    </div>
+
+    <div class="section">
+      <h2>Transactions</h2>
+      <button id="btnTradeCenter">🔄 Trade Center</button>
+      <button id="btnWeeklyGameplan">📋 Weekly Gameplan</button>
+      <button id="btnCheckTradeReqs">⚠️ Trade Requests</button>
+    </div>
+
+    <!-- Unlocked after Black Monday -->
+    <div class="section" id="section-free-agency" style="display:none">
+      <h2>Free Agency</h2>
+      <button id="btnFreeAgency">💼 Browse Free Agents</button>
+      <button id="btnCapChart">💰 Salary Cap</button>
+      <button id="btnSimFA">⏩ Simulate FA Period</button>
+    </div>
+
+    <!-- Unlocked after Free Agency closes -->
+    <div class="section" id="section-draft" style="display:none">
+      <h2>Draft</h2>
+      <button id="btnViewDraftOrder">📋 Draft Order</button>
+      <button id="btnStartDraft">🎯 Start Draft</button>
+    </div>
+
+  </div>
+</aside>
+
+<main id="main">
+  <div class="welcome-hero" id="homeHero">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-size:28px">⚡</span>
+      <div>
+        <h2 style="margin:0;font-size:20px" id="homeFranchiseName">Football Sim</h2>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Team Manager</div>
+      </div>
+    </div>
+    <!-- Team dropdowns hidden — franchise set via New Game flow -->
+    <select id="homeTeamSelect" onchange="window.onHomeTeamChange(this.value)" style="display:none"></select>
+    <div id="homeDashboard" style="margin-top:4px"></div>
+  </div>
+  <div class="quick-grid">
+    <button class="quick-card" onclick="closeDrawer();document.getElementById('btnSimWeek').click()">
+      <span class="q-icon">⚡</span>
+      <span class="q-label">Sim Week</span>
+      <span class="q-sub">Advance the season</span>
+    </button>
+    <button class="quick-card" onclick="closeDrawer();window.simEntireSeason&&window.simEntireSeason()">
+      <span class="q-icon">⏩</span>
+      <span class="q-label">Sim Season</span>
+      <span class="q-sub">Skip to Week 17</span>
+    </button>
+    <button class="quick-card" onclick="closeDrawer();document.getElementById('btnViewRoster').click()">
+      <span class="q-icon">👥</span>
+      <span class="q-label">Roster</span>
+      <span class="q-sub">Manage your team</span>
+    </button>
+    <button class="quick-card" onclick="closeDrawer();document.getElementById('btnViewStandings').click()">
+      <span class="q-icon">📊</span>
+      <span class="q-label">Standings</span>
+      <span class="q-sub">Division & conference</span>
+    </button>
+    <button class="quick-card" onclick="closeDrawer();renderSaveLoad()">
+      <span class="q-icon">💾</span>
+      <span class="q-label">Save / Load</span>
+      <span class="q-sub">3 save slots</span>
+    </button>
+    <button class="quick-card" onclick="closeDrawer();document.getElementById('btnLeagueLeaders').click()">
+      <span class="q-icon">🏆</span>
+      <span class="q-label">Leaders</span>
+      <span class="q-sub">Top performers</span>
+    </button>
+    <button class="quick-card" onclick="closeDrawer();document.getElementById('btnFreeAgency').click()">
+      <span class="q-icon">💼</span>
+      <span class="q-label">Free Agency</span>
+      <span class="q-sub">Sign players</span>
+    </button>
+    <!-- Draft is triggered automatically through the offseason pipeline, not manually -->
+    <button class="quick-card" onclick="closeDrawer();document.getElementById('btnStartDraft').click()" style="display:none">
+      <span class="q-icon">🎯</span>
+      <span class="q-label">Draft</span>
+      <span class="q-sub">Pick rookies</span>
+    </button>
+    <button class="quick-card" onclick="typeof renderPlayerStats==='function'&&renderPlayerStats()">
+      <span class="q-icon">📈</span>
+      <span class="q-label">Player Stats</span>
+      <span class="q-sub">Season totals</span>
+    </button>
+    <button class="quick-card" onclick="typeof renderDepthChart==='function'&&renderDepthChart()">
+      <span class="q-icon">📐</span>
+      <span class="q-label">Depth Chart</span>
+      <span class="q-sub">Starters &amp; depth</span>
+    </button>
+    <button class="quick-card" onclick="window.renderTradePicksUI&&window.renderTradePicksUI()">
+      <span class="q-icon">🔄</span>
+      <span class="q-label">Trade Center</span>
+      <span class="q-sub">Players &amp; picks</span>
+    </button>
+    <button class="quick-card" onclick="typeof renderCoachingHub==='function'&&renderCoachingHub()">
+      <span class="q-icon">🧠</span>
+      <span class="q-label">Coaches</span>
+      <span class="q-sub">Staff &amp; schemes</span>
+    </button>
+    <button class="quick-card" onclick="renderTransactionLog()">
+      <span class="q-icon">📋</span>
+      <span class="q-label">Transactions</span>
+      <span class="q-sub">Trades, signings &amp; cuts</span>
+    </button>
+    <button class="quick-card" onclick="window.startNewGame()">
+      <span class="q-icon">🏈</span>
+      <span class="q-label">New Game</span>
+      <span class="q-sub">Pick franchise</span>
+    </button>
+    <button class="quick-card" id="injReportTile" onclick="window.renderInjuryReport()">
+      <span class="q-icon">🤕</span>
+      <span class="q-label">Injury Report <span id="injBadgeCount" style="display:none;background:#ef4444;color:#fff;border-radius:99px;font-size:9px;padding:1px 5px;font-weight:700;vertical-align:middle"></span></span>
+      <span class="q-sub">Active injuries &amp; suspensions</span>
+    </button>
+  </div>
+  <div class="tip-bar">
+    💡 Tap <strong>☰</strong> for the full menu — strategy, awards, trades, coaching & more.
+  </div>
+</main>
+
+<!-- @scripts -->
+</body>
+</html>

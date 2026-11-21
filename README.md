@@ -1,0 +1,102 @@
+# CapFootball
+
+**Play it:** [luminous-begonia-f68904.netlify.app](https://luminous-begonia-f68904.netlify.app/)
+
+A 32-team football general manager simulation that runs entirely in the browser. You take over a franchise, hire a head coach, and run it season after season: weekly game simulation, depth charts, trades, free agency, contracts and the salary cap, coaching staffs and schemes, injuries, a week-by-week playoff bracket, Black Monday, and a 7-round draft.
+
+There is no backend. Everything runs client-side, and saves download as files you can load later.
+
+## Quick start
+
+Requires Node.js 20 or newer.
+
+```bash
+npm install
+npm run dev      # http://localhost:5173, rebuilds when you save a file
+```
+
+Refresh the browser after a rebuild to see changes.
+
+## Scripts
+
+| Command          | What it does                                                    |
+| ---------------- | --------------------------------------------------------------- |
+| `npm run dev`    | Unminified build plus a local server that rebuilds on change    |
+| `npm run build`  | Production build into `dist/` (minified, content-hashed assets) |
+| `npm test`       | Builds, then plays a full season and offseason headlessly       |
+| `npm run lint`   | ESLint                                                          |
+| `npm run format` | Prettier (`format:check` verifies without writing)              |
+
+## CI and deploying
+
+`.github/workflows/ci.yml` lints, checks formatting, tests and builds every push and pull request.
+
+The live game is hosted on Netlify. `netlify.toml` tells it to run `npm run build` and publish `dist/`, so every push to `main` redeploys, and every pull request gets its own preview link. `dist/` is a plain static site with relative asset paths, so GitHub Pages, Vercel or any static host works too.
+
+## Project layout
+
+```
+src/
+  index.html            Page shell and navigation markup
+  styles/main.css       All styles
+  load-order.json       The order source files are concatenated in (see below)
+  js/
+    core/               League creation, schedule, game simulation engine, shared helpers
+    sim/                Stat distribution, scheme matchups, matchup-aware box scores
+    season/             Season calendar, playoffs, end-of-season routing
+    offseason/          Offseason pipeline (contract expirations, draft class import)
+    roster/             Rosters, positions, depth charts, player detail
+    players/            Attributes, development and progression, injuries
+    coaching/           Coaches, coordinators, schemes, Black Monday, coaching hub
+    contracts/          Negotiation, re-signing, cap management
+    free-agency/        Free agent pool, offers, CPU bidding
+    draft/              Draft order, pick registry, rookie generation, CPU drafting
+    trades/             Trade center, trade values, CPU trade offers
+    team/               Team chemistry
+    stats/  awards/     Stats, league leaders, awards
+    league/             Transaction log
+    save/               Save / load
+    game/               New game flow (franchise picker, coach creation, roster import)
+    ui/                 Navigation drawer, home dashboard, tables, animations
+scripts/
+  build.js              Concatenates and minifies into dist/
+  dev.js                Dev server with rebuild-on-change
+tests/
+  smoke.test.js         Headless end-to-end season test
+```
+
+## How the code fits together
+
+The game is written as classic browser scripts that share one global scope, not ES modules. The markup and generated HTML call functions by name through inline `onclick` handlers, so those functions have to be globals. An earlier move to ES modules broke every one of those handlers, which is why this layout exists.
+
+Some files extend a function defined in an earlier file:
+
+```js
+var previous = window.simulateGame;
+window.simulateGame = function (...args) {
+  const result = previous(...args);
+  // ...add behaviour...
+  return result;
+};
+```
+
+Because of this, **file order matters**. `src/load-order.json` is the single source of truth for that order. The build fails if a file is listed but missing, or present but not listed. When you add a file, put it after anything it builds on.
+
+One rule that follows from concatenating everything into a single script: don't declare a global with `var` that has the same name as a `function` declaration in another file. Function declarations are hoisted to the top of the bundle, so the `var` assignment would silently win.
+
+## Testing
+
+`npm test` builds the game, then runs two kinds of headless tests in [jsdom](https://github.com/jsdom/jsdom) with a seeded random number generator:
+
+- **Smoke test** (`tests/smoke.test.js`): new game → 17 weeks → playoffs → Black Monday → free agency → draft → next season. Fails on any uncaught error, checks CPU rosters survive the offseason, and checks that the same seed always produces the same league.
+- **Balance test** (`tests/balance.test.js`): plays ten full seasons and fails if the league's average rating drifts more than 2.5 points or the number of 90+ players leaves its target range. Run it after touching player development, the draft or free agency.
+
+CI runs both on every push, so a broken build never deploys.
+
+## Roster and draft class files
+
+On the coach-creation screen you can download the league roster as a CSV, edit it in any spreadsheet and import it back. The draft screen does the same for each year's draft class. Both use the format described at the top of `src/js/game/player-csv.js`: name, position, age, overall, potential, dev_trait, contract_salary, contract_years and the 39 attribute columns (roster files also have team_id and team_name). When attribute columns are present, overall is recalculated from them. Common position names (LT, DE, MLB, …) are accepted, and rows that can't be read are skipped and listed after import.
+
+## Player development
+
+Every player has a **Potential**, the highest overall he can reach (`src/js/players/potential.js`). Players grow during the season: fastest when young, starting and productive, slower as they near their Potential, and not at all once they reach it. A development-trait upgrade (Star → Superstar → X-Factor, earned from season stats) re-rolls Potential from the new trait, current overall and age. Players 30 and older decline once a year at the end of the season.
